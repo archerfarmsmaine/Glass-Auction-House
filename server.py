@@ -20,7 +20,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 CATALOG_URL = "https://www.absenteeauctions.com/agg/cgi-bin/CATALL.CGI"
-LOT_LO = 200
+LOT_LO = 201
 LOT_HI = 280
 CACHE_TTL_SECONDS = 45
 PORT = int(os.environ.get("PORT", 8787))
