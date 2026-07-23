@@ -1,0 +1,228 @@
+:root {
+  --bg: #f7f5f0;
+  --panel: #ffffff;
+  --ink: #1f1b16;
+  --muted: #7a7268;
+  --accent: #8a5a2b;
+  --accent-ink: #ffffff;
+  --border: #e4dfd4;
+  --row-hover: #f1ece0;
+  --badge-nobid-bg: #fdeccf;
+  --badge-nobid-ink: #8a5a00;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17140f;
+    --panel: #221e17;
+    --ink: #ece6da;
+    --muted: #a89d8c;
+    --accent: #d1994f;
+    --accent-ink: #1f1b16;
+    --border: #362f24;
+    --row-hover: #2b261d;
+    --badge-nobid-bg: #4a3a17;
+    --badge-nobid-ink: #f0c878;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #17140f;
+  --panel: #221e17;
+  --ink: #ece6da;
+  --muted: #a89d8c;
+  --accent: #d1994f;
+  --accent-ink: #1f1b16;
+  --border: #362f24;
+  --row-hover: #2b261d;
+  --badge-nobid-bg: #4a3a17;
+  --badge-nobid-ink: #f0c878;
+}
+
+:root[data-theme="light"] {
+  --bg: #f7f5f0;
+  --panel: #ffffff;
+  --ink: #1f1b16;
+  --muted: #7a7268;
+  --accent: #8a5a2b;
+  --accent-ink: #ffffff;
+  --border: #e4dfd4;
+  --row-hover: #f1ece0;
+  --badge-nobid-bg: #fdeccf;
+  --badge-nobid-ink: #8a5a00;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+}
+
+.muted { color: var(--muted); }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.topbar h1 {
+  font-size: 1.3rem;
+  margin: 0;
+  font-weight: 600;
+}
+
+.topbar h1 .muted {
+  font-weight: 400;
+  font-size: 1rem;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+#refreshBtn {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+#refreshBtn:active { opacity: 0.8; }
+
+.summary-bar {
+  display: flex;
+  gap: 1px;
+  background: var(--border);
+  margin: 1rem 1.5rem;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.stat {
+  flex: 1;
+  min-width: 160px;
+  background: var(--panel);
+  padding: 0.9rem 1.1rem;
+}
+
+.stat-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.3rem;
+}
+
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stale-banner {
+  margin: 0 1.5rem 1rem;
+  padding: 0.6rem 1rem;
+  background: var(--badge-nobid-bg);
+  color: var(--badge-nobid-ink);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+main {
+  margin: 0 1.5rem 2rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+thead th {
+  text-align: left;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+tbody tr:hover { background: var(--row-hover); }
+tbody tr:last-child td { border-bottom: none; }
+
+.thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+  border: 1px solid var(--border);
+}
+
+.lot-num {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.desc {
+  max-width: 480px;
+  color: var(--ink);
+}
+
+.num-bids, .bid-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bid-amount { font-weight: 600; }
+
+.badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+}
+
+.badge-nobid {
+  background: var(--badge-nobid-bg);
+  color: var(--badge-nobid-ink);
+}
+
+footer {
+  margin: 0 1.5rem 2rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  max-width: 70ch;
+}

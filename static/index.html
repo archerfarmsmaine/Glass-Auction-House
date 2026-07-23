@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dad's Lots — American Glass Gallery</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>Dad's Lots <span class="muted">#200&ndash;280</span></h1>
+  <div class="topbar-right">
+    <span id="lastUpdated" class="muted">Loading&hellip;</span>
+    <button id="refreshBtn">Refresh now</button>
+  </div>
+</header>
+
+<section id="summaryBar" class="summary-bar">
+  <div class="stat">
+    <div class="stat-label">Running total (current bids)</div>
+    <div class="stat-value" id="statTotal">&mdash;</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Lots with bids</div>
+    <div class="stat-value" id="statLotsWithBids">&mdash;</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Total bids placed</div>
+    <div class="stat-value" id="statBidCount">&mdash;</div>
+  </div>
+</section>
+
+<div id="staleBanner" class="stale-banner" hidden></div>
+
+<main>
+  <table id="lotsTable">
+    <thead>
+      <tr>
+        <th></th>
+        <th>Lot</th>
+        <th>Description</th>
+        <th># Bids</th>
+        <th>Current Bid</th>
+      </tr>
+    </thead>
+    <tbody id="lotsBody"></tbody>
+  </table>
+</main>
+
+<footer class="muted">
+  Data pulled from absenteeauctions.com's public catalog pages. "Current Bid" reflects the site's
+  displayed amount, which may just be the minimum bid if no bid has been accepted yet (marked
+  <span class="badge badge-nobid">no bid yet</span>). This is not necessarily what will be paid
+  (buyer's premium, reserve, and final winning bidder are not reflected here).
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
