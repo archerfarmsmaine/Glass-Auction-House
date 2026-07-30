@@ -252,3 +252,50 @@ footer {
   line-height: 1.5;
   max-width: 70ch;
 }
+
+.sponsor-bar {
+  margin: 0 1.5rem 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.sponsor-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.8rem;
+}
+
+.sponsor-logos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.sponsor-card {
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 0.6rem 1.1rem;
+  border: 1px solid var(--border);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* This logo is white-on-transparent, so it needs a dark backdrop regardless
+   of the page's light/dark theme. */
+.sponsor-card--dark {
+  background: #14110c;
+}
+
+.sponsor-card:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+.sponsor-card img {
+  height: 42px;
+  width: auto;
+  display: block;
+}
