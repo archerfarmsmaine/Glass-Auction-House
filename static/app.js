@@ -6,6 +6,85 @@ const fmtMoney = (n) =>
 const fmtTime = (epochSeconds) =>
   new Date(epochSeconds * 1000).toLocaleTimeString();
 
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+// Unlock audio on the first user interaction (browsers block sound before that).
+document.addEventListener("click", () => getAudioCtx().resume(), { once: true });
+
+function playChaChing() {
+  const ctx = getAudioCtx();
+  if (ctx.state === "suspended") ctx.resume();
+  const t0 = ctx.currentTime;
+
+  // Mechanical "cha" — a short burst of filtered noise, like a register
+  // lever/latch snapping, ahead of the bell strikes.
+  const noiseDur = 0.06;
+  const bufferSize = Math.floor(ctx.sampleRate * noiseDur);
+  const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const samples = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) {
+    samples[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+  }
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = "bandpass";
+  noiseFilter.frequency.value = 2500;
+  noiseFilter.Q.value = 1.2;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.35, t0);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, t0 + noiseDur);
+  noise.connect(noiseFilter).connect(noiseGain).connect(ctx.destination);
+  noise.start(t0);
+  noise.stop(t0 + noiseDur + 0.02);
+
+  // Bell strike — a few slightly inharmonic partials (real bells aren't
+  // simple sine waves), each with a fast attack and its own decay tail.
+  const bell = (start, baseFreq, peak, decay) => {
+    const partials = [1, 2.42, 3.85, 5.43];
+    partials.forEach((ratio, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(baseFreq * ratio, t0 + start);
+      const partialPeak = peak / (i + 1);
+      gain.gain.setValueAtTime(0, t0 + start);
+      gain.gain.linearRampToValueAtTime(partialPeak, t0 + start + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + start + decay);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t0 + start);
+      osc.stop(t0 + start + decay + 0.05);
+    });
+  };
+
+  // Two quick strikes = the classic "ching-ching" of a register bell.
+  bell(0.05, 1760, 0.22, 0.5);
+  bell(0.12, 2093, 0.18, 0.55);
+}
+
+// Remembers each lot's bid count from the previous poll so we can tell
+// which lots got a new bid since then (vs. just re-rendering the same data).
+let previousBidState = null;
+
+function announceNewBids(lots) {
+  const newState = new Map(lots.map((l) => [l.lot, l.numBids ?? 0]));
+
+  if (previousBidState) {
+    let changed = 0;
+    for (const [lot, numBids] of newState) {
+      if (numBids > (previousBidState.get(lot) ?? 0)) {
+        setTimeout(playChaChing, changed * 200);
+        changed++;
+      }
+    }
+  }
+
+  previousBidState = newState;
+}
+
 async function loadLots(force) {
   const url = "/api/lots" + (force ? "?refresh=1" : "");
   const res = await fetch(url);
@@ -30,6 +109,8 @@ async function loadLots(force) {
     data.summary.lotsWithBids + " / " + data.summary.lotCount;
   document.getElementById("statBidCount").textContent =
     data.summary.totalBidCount;
+
+  announceNewBids(data.lots);
 
   const tbody = document.getElementById("lotsBody");
   tbody.innerHTML = "";
