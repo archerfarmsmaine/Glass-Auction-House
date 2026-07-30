@@ -1,5 +1,42 @@
 const REFRESH_MS = 60_000;
 
+const SPONSORS = [
+  { href: "https://archerteamrealty.com/", img: "sponsors/archer-and-associates.png", alt: "Archer and Associates Real Estate Team", dark: true },
+  { href: "https://archerelectricalpllc.com/", img: "sponsors/archer-electrical.png", alt: "Archer Electrical PLLC", dark: false },
+  { href: "tel:6036862926", text: "Have Gold or Silver to sell? Call or Text 603-686-2926 NOW!" },
+  { text: "SKYS CLEANOUTS. TOO BUSY DONT INQUIRE" },
+];
+
+function buildTickerGroup(container, repeats) {
+  for (let i = 0; i < repeats; i++) {
+    for (const s of SPONSORS) {
+      const el = document.createElement(s.href ? "a" : "div");
+      if (s.href) {
+        el.href = s.href;
+        if (s.img) {
+          el.target = "_blank";
+          el.rel = "noopener noreferrer";
+        }
+      }
+      el.className = "sponsor-card" + (s.dark ? " sponsor-card--dark" : "") + (s.text ? " sponsor-card--text" : "");
+      if (s.img) {
+        const img = document.createElement("img");
+        img.src = s.img;
+        img.alt = s.alt;
+        el.appendChild(img);
+      } else {
+        el.textContent = s.text;
+      }
+      container.appendChild(el);
+    }
+  }
+}
+
+// Two identical groups side by side, animated from translateX(0) to -50%,
+// so the loop point lands exactly where the (identical) second group began.
+buildTickerGroup(document.getElementById("tickerGroupA"), 5);
+buildTickerGroup(document.getElementById("tickerGroupB"), 5);
+
 const fmtMoney = (n) =>
   n == null ? "—" : "$" + n.toLocaleString("en-US");
 
