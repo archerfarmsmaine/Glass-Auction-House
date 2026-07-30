@@ -16,13 +16,9 @@
 </header>
 
 <section id="summaryBar" class="summary-bar">
-  <div class="stat">
+  <div class="stat stat-hero">
     <div class="stat-label">Running total (current bids)</div>
     <div class="stat-value" id="statTotal">&mdash;</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">Lots with bids</div>
-    <div class="stat-value" id="statLotsWithBids">&mdash;</div>
   </div>
   <div class="stat">
     <div class="stat-label">Total bids placed</div>
@@ -31,6 +27,8 @@
 </section>
 
 <div id="staleBanner" class="stale-banner" hidden></div>
+
+<canvas id="fireworksCanvas"></canvas>
 
 <main>
   <table id="lotsTable">

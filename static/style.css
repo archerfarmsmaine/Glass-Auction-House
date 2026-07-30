@@ -136,6 +136,32 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.stat-hero {
+  flex: 2;
+  min-width: 240px;
+}
+
+.stat-hero .stat-label {
+  font-size: 0.9rem;
+}
+
+.stat-hero .stat-value {
+  font-size: 3.4rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.1;
+}
+
+#fireworksCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+  display: none;
+}
+
 .stale-banner {
   margin: 0 1.5rem 1rem;
   padding: 0.6rem 1rem;

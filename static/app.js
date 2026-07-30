@@ -65,6 +65,89 @@ function playChaChing() {
   bell(0.12, 2093, 0.18, 0.55);
 }
 
+const FIREWORKS_THRESHOLD = 500_000;
+let firedFireworksForThreshold = false;
+
+function checkFireworksThreshold(total) {
+  if (total >= FIREWORKS_THRESHOLD) {
+    if (!firedFireworksForThreshold) {
+      firedFireworksForThreshold = true;
+      launchFireworks();
+    }
+  } else {
+    firedFireworksForThreshold = false;
+  }
+}
+
+function launchFireworks() {
+  const canvas = document.getElementById("fireworksCanvas");
+  const ctx2d = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+  canvas.style.display = "block";
+
+  const colors = ["#ff5252", "#ffd740", "#69f0ae", "#40c4ff", "#e040fb", "#ff6e40", "#ffffff"];
+  let particles = [];
+
+  function spawnBurst(x, y) {
+    const count = 70;
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.15;
+      const speed = 2 + Math.random() * 4.5;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1,
+        decay: 0.01 + Math.random() * 0.012,
+        color,
+      });
+    }
+  }
+
+  const burstDelays = [0, 280, 560, 900, 1250, 1600];
+  burstDelays.forEach((delay) => {
+    setTimeout(() => {
+      spawnBurst(W * (0.15 + Math.random() * 0.7), H * (0.15 + Math.random() * 0.35));
+    }, delay);
+  });
+
+  const startTime = performance.now();
+  const minRunTime = burstDelays[burstDelays.length - 1] + 200;
+
+  function frame(now) {
+    ctx2d.clearRect(0, 0, W, H);
+    particles.forEach((p) => {
+      p.vy += 0.05;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= p.decay;
+    });
+    particles = particles.filter((p) => p.life > 0);
+    particles.forEach((p) => {
+      ctx2d.globalAlpha = Math.max(p.life, 0);
+      ctx2d.fillStyle = p.color;
+      ctx2d.beginPath();
+      ctx2d.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+      ctx2d.fill();
+    });
+    ctx2d.globalAlpha = 1;
+
+    if (now - startTime < minRunTime || particles.length > 0) {
+      requestAnimationFrame(frame);
+    } else {
+      canvas.style.display = "none";
+      ctx2d.clearRect(0, 0, W, H);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
 // Remembers each lot's bid count from the previous poll so we can tell
 // which lots got a new bid since then (vs. just re-rendering the same data).
 let previousBidState = null;
@@ -105,12 +188,11 @@ async function loadLots(force) {
 
   document.getElementById("statTotal").textContent =
     fmtMoney(data.summary.totalCurrentBid);
-  document.getElementById("statLotsWithBids").textContent =
-    data.summary.lotsWithBids + " / " + data.summary.lotCount;
   document.getElementById("statBidCount").textContent =
     data.summary.totalBidCount;
 
   announceNewBids(data.lots);
+  checkFireworksThreshold(data.summary.totalCurrentBid);
 
   const tbody = document.getElementById("lotsBody");
   tbody.innerHTML = "";
