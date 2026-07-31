@@ -9,6 +9,7 @@ Run:  python3 server.py
 Then open http://localhost:8787 in a browser.
 """
 
+import concurrent.futures
 import html
 import json
 import os
@@ -20,15 +21,23 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 CATALOG_URL = "https://www.absenteeauctions.com/agg/cgi-bin/CATALL.CGI"
+SHOWITEM_URL = "https://www.absenteeauctions.com/agg/cgi-bin/SHOWITEM.CGI"
 LOT_LO = 201
 LOT_HI = 280
 CACHE_TTL_SECONDS = 45
+STATUS_CHECK_WORKERS = 15
 PORT = int(os.environ.get("PORT", 8787))
 
 STATIC_DIR = Path(__file__).parent / "static"
 
 _cache_lock = threading.Lock()
 _cache = {"data": None, "fetched_at": 0}
+
+# Lots close for good and never reopen, so once a lot is seen closed we never
+# need to check it again — this set only grows, and per-lot status checks
+# get cheaper over the course of the auction as more lots settle.
+_closed_lots_lock = threading.Lock()
+_closed_lots = set()
 
 LOT_BLOCK_RE = re.compile(r'<A NAME="L(\d+)">')
 BIDS_RE = re.compile(r'ALIGN=CENTER><FONT FACE="Arial">([^<]*)</FONT>')
@@ -51,6 +60,40 @@ def fetch_page(start_lot):
     )
     with urllib.request.urlopen(req, timeout=20) as resp:
         return resp.read().decode("utf-8", errors="replace")
+
+
+def check_lot_closed(lot_num):
+    body = f"srch=&num=0&itf={lot_num}&bok=0".encode()
+    req = urllib.request.Request(
+        SHOWITEM_URL,
+        data=body,
+        method="POST",
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mozilla/5.0 (compatible; personal-lot-monitor/1.0)",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        text = resp.read().decode("utf-8", errors="replace")
+    return "LOT CLOSED" in text
+
+
+def refresh_closed_status(lot_numbers):
+    with _closed_lots_lock:
+        to_check = [n for n in lot_numbers if n not in _closed_lots]
+    if not to_check:
+        return
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=STATUS_CHECK_WORKERS) as executor:
+        future_to_lot = {executor.submit(check_lot_closed, n): n for n in to_check}
+        for future in concurrent.futures.as_completed(future_to_lot):
+            lot_num = future_to_lot[future]
+            try:
+                if future.result():
+                    with _closed_lots_lock:
+                        _closed_lots.add(lot_num)
+            except Exception:
+                pass  # leave it as "open" for now; we'll check again next cycle
 
 
 def parse_page(text, lo, hi):
@@ -102,6 +145,11 @@ def fetch_all_lots(lo=LOT_LO, hi=LOT_HI):
         text = fetch_page(st)
         for lot in parse_page(text, lo, hi):
             all_lots[lot["lot"]] = lot
+
+    refresh_closed_status(all_lots.keys())
+    with _closed_lots_lock:
+        for lot in all_lots.values():
+            lot["open"] = lot["lot"] not in _closed_lots
 
     ordered = [all_lots[n] for n in sorted(all_lots)]
     return ordered
@@ -163,6 +211,7 @@ class Handler(BaseHTTPRequestHandler):
             total_current = sum(l["currentBid"] for l in lots if l["currentBid"] is not None)
             lots_with_bids = [l for l in lots if l["numBids"]]
             total_bid_count = sum(l["numBids"] or 0 for l in lots)
+            open_lot_count = sum(1 for l in lots if l.get("open", True))
 
             self._send_json({
                 "lots": lots,
@@ -173,6 +222,7 @@ class Handler(BaseHTTPRequestHandler):
                     "lotsWithBids": len(lots_with_bids),
                     "totalCurrentBid": total_current,
                     "totalBidCount": total_bid_count,
+                    "openLotCount": open_lot_count,
                 },
             })
             return

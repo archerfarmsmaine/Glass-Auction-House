@@ -278,6 +278,18 @@ async function loadLots(force) {
     numTd.textContent = lot.lot;
     tr.appendChild(numTd);
 
+    const statusTd = document.createElement("td");
+    const statusBadge = document.createElement("span");
+    if (lot.open) {
+      statusBadge.className = "badge badge-open";
+      statusBadge.textContent = "Open";
+    } else {
+      statusBadge.className = "badge badge-closed";
+      statusBadge.textContent = "Closed";
+    }
+    statusTd.appendChild(statusBadge);
+    tr.appendChild(statusTd);
+
     const descTd = document.createElement("td");
     descTd.className = "desc";
     descTd.textContent = lot.title || "";
