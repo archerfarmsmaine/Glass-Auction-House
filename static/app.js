@@ -257,9 +257,11 @@ async function loadLots(force) {
   announceNewBids(data.lots);
   checkFireworksThreshold(data.summary.totalCurrentBid);
 
+  const sortedLots = [...data.lots].sort((a, b) => (b.currentBid ?? 0) - (a.currentBid ?? 0));
+
   const tbody = document.getElementById("lotsBody");
   tbody.innerHTML = "";
-  for (const lot of data.lots) {
+  for (const lot of sortedLots) {
     const tr = document.createElement("tr");
 
     const thumbTd = document.createElement("td");
