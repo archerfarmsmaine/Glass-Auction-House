@@ -48,10 +48,36 @@ function getAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return audioCtx;
 }
-// Unlock audio on the first user interaction (browsers block sound before that).
-document.addEventListener("click", () => getAudioCtx().resume(), { once: true });
+
+// Browsers refuse to play audio until it's unlocked by a real user gesture
+// (a click), and only a resume() called *directly inside* that gesture's
+// event handler counts — a poll-triggered resume() a minute later is
+// silently ignored. That's why the chime could go quiet with no error: the
+// context just never actually unlocked. This button is the reliable fix —
+// it also gives the user an explicit on/off control and visible state.
+let soundEnabled = false;
+const soundBtn = document.getElementById("soundToggleBtn");
+
+function setSoundEnabled(enabled) {
+  soundEnabled = enabled;
+  soundBtn.dataset.enabled = String(enabled);
+  soundBtn.textContent = (enabled ? "\u{1F50A} Sound on" : "\u{1F508} Sound off");
+}
+
+soundBtn.addEventListener("click", () => {
+  const ctx = getAudioCtx();
+  if (ctx.state === "suspended") ctx.resume();
+  if (!soundEnabled) {
+    // Play a chime right away as confirmation that audio actually works.
+    setSoundEnabled(true);
+    playChaChing();
+  } else {
+    setSoundEnabled(false);
+  }
+});
 
 function playChaChing() {
+  if (!soundEnabled) return;
   const ctx = getAudioCtx();
   if (ctx.state === "suspended") ctx.resume();
   const t0 = ctx.currentTime;

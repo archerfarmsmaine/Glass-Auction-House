@@ -104,6 +104,23 @@ body {
 
 #refreshBtn:active { opacity: 0.8; }
 
+#soundToggleBtn {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+#soundToggleBtn[data-enabled="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+#soundToggleBtn:active { opacity: 0.8; }
+
 .summary-bar {
   display: flex;
   gap: 1px;
