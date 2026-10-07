@@ -1,0 +1,780 @@
+<title>Archer Farms POS</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<!--
+  ARCHER FARMS POS v7
+  ─────────────────────────────────────────
+  TO CONNECT SUPABASE:
+  1. Replace SUPABASE_URL and SUPABASE_KEY below with your project credentials
+  2. Run the SQL schema at the bottom of this file in your Supabase SQL editor
+  3. App will auto-switch from localStorage → Supabase
+
+  If Supabase is paused (free tier pauses after 7 days of inactivity):
+  → Go to supabase.com → your project → hit Resume
+  → Check Authentication → Policies for blocked writes
+  ─────────────────────────────────────────
+-->
+
+<style>
+/* ── TOKENS ──────────────────────────────────────────────── */
+:root {
+  --g: #1a5c38; --gl: #2d8a55; --gm: #4db87a;
+  --gold: #c8a84b;
+  --bg: #0d1f14; --sf: #142b1c; --sf2: #1c3825; --bd: #2a4a35;
+  --tx: #f0f5f1; --txm: #7da88a; --txd: #4a7055;
+  --danger: #e05555;
+  --r: 10px; --rl: 16px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0 }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--tx); min-height: 100%; display: flex; flex-direction: column; font-size: 14px; }
+
+/* ── HEADER / NAV ─────────────────────────────────────────── */
+header { background: var(--sf); border-bottom: 1px solid var(--bd); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 52px; flex-shrink: 0; }
+.brand { font-size: 17px; font-weight: 800; letter-spacing: -.5px; font-family: 'Syne', sans-serif; }
+.brand em { color: var(--gold); font-style: normal; } .brand span { color: var(--gm); }
+nav { background: var(--sf); border-bottom: 1px solid var(--bd); display: flex; padding: 0 20px; flex-shrink: 0; overflow-x: auto; }
+nav button { background: none; border: none; color: var(--txm); padding: 10px 14px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 5px; border-bottom: 2px solid transparent; transition: all .2s; white-space: nowrap; }
+nav button:hover { color: var(--tx); }
+nav button.active { color: var(--gm); border-bottom-color: var(--gm); }
+nav button i { font-size: 15px; }
+main { flex: 1; padding: 16px 20px; overflow-y: auto; }
+
+/* ── CARDS ────────────────────────────────────────────────── */
+.card { background: var(--sf); border: 1px solid var(--bd); border-radius: var(--rl); padding: 16px; }
+.stitle { font-size: 14px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 7px; color: var(--tx); font-family: 'Syne', sans-serif; }
+.stitle i { color: var(--gm); font-size: 16px; }
+.tab-content { display: none; } .tab-content.active { display: block; }
+
+/* ── BUTTONS ──────────────────────────────────────────────── */
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 8px 14px; border-radius: var(--r); border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; transition: all .15s; }
+.btn-primary { background: var(--gl); color: #fff; } .btn-primary:hover { background: var(--g); }
+.btn-secondary { background: var(--sf2); color: var(--tx); border: 1px solid var(--bd); } .btn-secondary:hover { border-color: var(--gm); color: var(--gm); }
+.btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); } .btn-danger:hover { background: var(--danger); color: #fff; }
+.btn-gold { background: var(--gold); color: #1a1208; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-icon { padding: 6px; border-radius: 8px; }
+
+/* ── FORMS ────────────────────────────────────────────────── */
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 11px; color: var(--txm); text-transform: uppercase; letter-spacing: .4px; font-weight: 500; }
+.form-group input, .form-group select { background: var(--bg); border: 1px solid var(--bd); border-radius: var(--r); padding: 8px 11px; color: var(--tx); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border .2s; width: 100%; }
+.form-group input:focus, .form-group select:focus { border-color: var(--gm); }
+.form-group input::placeholder { color: var(--txd); }
+.form-group select option { background: var(--sf); }
+.fg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fg-full { grid-column: 1 / -1; }
+
+/* ── MODALS ───────────────────────────────────────────────── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.8); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+.modal { background: var(--sf); border: 1px solid var(--bd); border-radius: var(--rl); padding: 20px; width: 100%; max-width: 520px; max-height: 92vh; overflow-y: auto; }
+.modal-wide { max-width: 640px; }
+.modal-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; font-family: 'Syne', sans-serif; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid var(--bd); padding-top: 14px; flex-wrap: wrap; }
+
+/* ── TABLE ────────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; border-radius: var(--r); border: 1px solid var(--bd); }
+table { width: 100%; border-collapse: collapse; }
+th { background: var(--sf2); padding: 9px 13px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--txm); font-weight: 600; border-bottom: 1px solid var(--bd); }
+td { padding: 10px 13px; border-bottom: 1px solid var(--bd); font-size: 13px; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--sf2); }
+
+/* ── BADGES / STATS ───────────────────────────────────────── */
+.badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.bg-green { background: #1a4a2a; color: var(--gm); } .bg-gold { background: #3a2c0a; color: var(--gold); }
+.bg-blue { background: #1a2e4a; color: #6ab0e8; } .bg-gray { background: var(--sf2); color: var(--txm); }
+.stat { background: var(--sf2); border: 1px solid var(--bd); border-radius: var(--r); padding: 14px; }
+.stat-label { font-size: 11px; color: var(--txm); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .5px; }
+.stat-value { font-size: 24px; font-weight: 700; font-family: 'Syne', sans-serif; }
+.stat-green .stat-value { color: var(--gm); } .stat-gold .stat-value { color: var(--gold); }
+
+/* ── SEARCH BAR ───────────────────────────────────────────── */
+.sbar { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--bd); border-radius: var(--r); padding: 7px 11px; }
+.sbar i { color: var(--txm); font-size: 16px; }
+.sbar input { background: none; border: none; color: var(--tx); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; flex: 1; }
+.sbar input::placeholder { color: var(--txd); }
+
+/* ── TOAST ────────────────────────────────────────────────── */
+.toast { position: fixed; bottom: 18px; right: 18px; background: var(--g); color: #fff; padding: 10px 16px; border-radius: var(--r); font-size: 13px; z-index: 300; display: flex; align-items: center; gap: 7px; transform: translateY(80px); opacity: 0; transition: all .3s; }
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* ── KANBAN ───────────────────────────────────────────────── */
+.kanban { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: start; }
+.kcol { background: var(--sf2); border: 1px solid var(--bd); border-radius: var(--rl); padding: 12px; }
+.kcol-hdr { font-size: 13px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; font-family: 'Syne', sans-serif; }
+.kcount { background: var(--sf); border: 1px solid var(--bd); border-radius: 20px; padding: 1px 7px; font-size: 11px; color: var(--txm); }
+.ocard { background: var(--sf); border: 1px solid var(--bd); border-radius: var(--r); padding: 13px; margin-bottom: 10px; transition: border-color .2s; }
+.ocard:hover { border-color: var(--gm); }
+.ocard-patient { font-size: 16px; font-weight: 700; font-family: 'Syne', sans-serif; color: var(--tx); margin-bottom: 2px; }
+.ocard-id { font-size: 11px; color: var(--txm); }
+
+/* ── EMPTY STATE ──────────────────────────────────────────── */
+.empty { text-align: center; padding: 22px 12px; color: var(--txm); }
+.empty i { font-size: 28px; margin-bottom: 7px; display: block; color: var(--txd); }
+.empty p { font-size: 13px; }
+.divider { border: none; border-top: 1px solid var(--bd); margin: 10px 0; }
+
+/* ── CHARTS ───────────────────────────────────────────────── */
+.chart-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.chart-label { font-size: 12px; color: var(--txm); width: 70px; text-align: right; flex-shrink: 0; }
+.chart-track { flex: 1; background: var(--sf2); border-radius: 4px; height: 18px; overflow: hidden; }
+.chart-fill { height: 100%; background: var(--gm); border-radius: 4px; display: flex; align-items: center; padding-left: 7px; transition: width .5s; }
+.chart-fill span { font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; }
+
+/* ── DASHBOARD LAYOUT ─────────────────────────────────────── */
+.dash-layout { display: grid; grid-template-columns: 1fr 300px; gap: 14px; align-items: start; }
+.dash-left { display: flex; flex-direction: column; gap: 12px; }
+.dash-right { display: flex; flex-direction: column; gap: 10px; }
+.stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ── PATIENT SEARCH (DASH) ────────────────────────────────── */
+.pt-result { padding: 8px 12px; border-radius: var(--r); border: 1px solid var(--bd); cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+.pt-result:hover { border-color: var(--gm); background: var(--sf2); }
+.selected-pt { background: var(--sf2); border: 1px solid var(--gm); border-radius: var(--r); padding: 9px 12px; display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.inline-form { background: var(--bg); border: 1px solid var(--bd); border-radius: var(--r); padding: 12px; margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+
+/* ── PRODUCT GRID ─────────────────────────────────────────── */
+.prod-area { position: relative; }
+.prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 7px; }
+.prod-tile { background: var(--sf2); border: 1px solid var(--bd); border-radius: var(--r); padding: 10px; cursor: pointer; transition: all .15s; text-align: left; width: 100%; }
+.prod-tile:hover { border-color: var(--gm); background: #1a3322; }
+.prod-tile.in-cart { border-color: var(--gm); background: #162e1e; }
+.prod-name { font-size: 12px; font-weight: 600; line-height: 1.3; margin-bottom: 2px; color: var(--tx); }
+.prod-cat { font-size: 10px; color: var(--txm); margin-bottom: 5px; }
+.prod-price { font-size: 13px; font-weight: 700; color: var(--gm); font-family: 'Syne', sans-serif; }
+.weight-popup { position: absolute; z-index: 50; background: var(--sf); border: 1px solid var(--gm); border-radius: var(--r); padding: 6px; min-width: 180px; box-shadow: 0 6px 20px rgba(0,0,0,.5); }
+.weight-opt { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: background .15s; gap: 8px; }
+.weight-opt:hover { background: var(--sf2); }
+
+/* ── CART ─────────────────────────────────────────────────── */
+.cart-item { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--bd); }
+.cart-item:last-child { border-bottom: none; }
+.qty-ctrl { display: flex; align-items: center; gap: 3px; }
+.qty-btn { background: var(--sf2); border: 1px solid var(--bd); color: var(--tx); width: 22px; height: 22px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; }
+.qty-btn:hover { border-color: var(--gm); color: var(--gm); }
+.order-done { background: var(--sf2); border: 1px solid var(--gm); border-radius: var(--r); padding: 12px; text-align: center; margin-top: 10px; }
+.status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.status-pill.placed { background: #1a2e4a; color: #6ab0e8; }
+.status-pill.ready { background: #3a2c0a; color: var(--gold); }
+.status-pill.completed { background: #1a4a2a; color: var(--gm); }
+
+/* ── PHOTOS ───────────────────────────────────────────────── */
+.photo-upload-area { border: 1px dashed var(--bd); border-radius: var(--r); padding: 14px; text-align: center; cursor: pointer; transition: border-color .2s; background: var(--bg); }
+.photo-upload-area:hover { border-color: var(--gm); }
+.photo-thumb { width: 100%; max-height: 140px; object-fit: cover; border-radius: 8px; border: 1px solid var(--bd); margin-top: 8px; display: block; }
+.photo-label { font-size: 11px; color: var(--txm); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .4px; font-weight: 500; }
+
+/* ── EDIT ORDER ───────────────────────────────────────────── */
+.edit-order-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--bg); border: 1px solid var(--bd); border-radius: var(--r); margin-bottom: 6px; }
+.eoi-name { flex: 1; font-size: 13px; font-weight: 500; line-height: 1.3; }
+.eoi-price-input { background: var(--sf2); border: 1px solid var(--bd); border-radius: 6px; padding: 5px 8px; color: var(--gm); font-size: 13px; font-weight: 700; width: 74px; text-align: right; font-family: 'DM Sans', sans-serif; outline: none; }
+.eoi-price-input:focus { border-color: var(--gm); }
+.eoi-sub { font-size: 13px; font-weight: 700; color: var(--gm); min-width: 56px; text-align: right; }
+.eo-prod-result { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: var(--r); border: 1px solid var(--bd); margin-bottom: 5px; cursor: pointer; transition: all .15s; }
+.eo-prod-result:hover { border-color: var(--gm); background: var(--sf2); }
+.eo-weight-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; padding: 0 0 6px; }
+
+/* ── RECEIPT ──────────────────────────────────────────────── */
+.receipt-line { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid var(--bd); }
+.receipt-line:last-child { border-bottom: none; }
+.receipt-price-input { background: var(--bg); border: 1px solid var(--bd); border-radius: 6px; padding: 4px 8px; color: var(--gm); font-size: 13px; font-weight: 700; width: 76px; text-align: right; font-family: 'DM Sans', sans-serif; outline: none; }
+.receipt-price-input:focus { border-color: var(--gm); }
+
+/* ── DB INDICATOR ─────────────────────────────────────────── */
+.db-status { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+.db-status.connected { background: #1a4a2a; color: var(--gm); }
+.db-status.local { background: #3a2c0a; color: var(--gold); }
+
+::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: var(--bg); } ::-webkit-scrollbar-thumb { background: var(--bd); border-radius: 10px; }
+@media (max-width: 680px) { .dash-layout { grid-template-columns: 1fr; } .kanban { grid-template-columns: 1fr; } }
+</style>
+
+<!-- HEADER -->
+<header>
+  <div class="brand"><em>Archer</em> <span>Farms</span> POS</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="db-indicator" class="db-status local">localStorage</span>
+    <span style="font-size:12px;color:var(--txm);font-family:'Syne',sans-serif" id="clock"></span>
+    <span class="badge bg-green"><i class="ti ti-circle-filled" style="font-size:8px"></i> Live</span>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav>
+  <button class="active" onclick="goTab('dashboard')" id="tab-dashboard"><i class="ti ti-home"></i> Home</button>
+  <button onclick="goTab('patients')" id="tab-patients"><i class="ti ti-users"></i> Patients</button>
+  <button onclick="goTab('inventory')" id="tab-inventory"><i class="ti ti-package"></i> Inventory</button>
+  <button onclick="goTab('orders')" id="tab-orders"><i class="ti ti-layout-kanban"></i> Orders</button>
+  <button onclick="goTab('sales')" id="tab-sales"><i class="ti ti-chart-bar"></i> Sales</button>
+</nav>
+
+<main>
+<!-- ── HOME ─────────────────────────────────────────────────── -->
+<div id="view-dashboard" class="tab-content active">
+  <div class="dash-layout">
+    <div class="dash-left">
+      <div class="stat-row">
+        <div class="stat stat-green"><div class="stat-label">Today's Revenue</div><div class="stat-value" id="dash-today">$0.00</div></div>
+        <div class="stat stat-gold"><div class="stat-label">Active Orders</div><div class="stat-value" id="dash-active">0</div></div>
+      </div>
+      <div class="card">
+        <div class="stitle"><i class="ti ti-user"></i> Patient</div>
+        <div class="sbar"><i class="ti ti-search"></i><input type="text" id="pt-search-dash" placeholder="Search by name or phone..." oninput="searchPatientDash(this.value)" autocomplete="off"></div>
+        <div id="pt-search-results" style="margin-top:6px"></div>
+        <div id="selected-pt-banner"></div>
+        <div style="margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="toggleQuickAdd()"><i class="ti ti-user-plus"></i> New Patient</button></div>
+        <div id="quick-add-form" style="display:none">
+          <div class="inline-form">
+            <div class="fg2">
+              <div class="form-group"><label>First Name</label><input type="text" id="qpt-fname"></div>
+              <div class="form-group"><label>Last Name</label><input type="text" id="qpt-lname"></div>
+              <div class="form-group"><label>Phone</label><input type="tel" id="qpt-phone"></div>
+              <div class="form-group"><label>Date of Birth</label><input type="date" id="qpt-dob"></div>
+              <div class="form-group fg-full"><label>Medical Card #</label><input type="text" id="qpt-card"></div>
+              <div class="form-group fg-full"><label>Gov. ID #</label><input type="text" id="qpt-id"></div>
+            </div>
+            <div style="display:flex;gap:7px;margin-top:4px">
+              <button class="btn btn-primary btn-sm" onclick="saveQuickPatient()"><i class="ti ti-check"></i> Save & Select</button>
+              <button class="btn btn-secondary btn-sm" onclick="toggleQuickAdd()">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card prod-area">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+          <div class="stitle" style="margin:0"><i class="ti ti-package"></i> Products</div>
+          <div class="sbar" style="flex:1;min-width:130px;max-width:200px;margin:0"><i class="ti ti-search"></i><input type="text" id="prod-search" placeholder="Search..." oninput="renderProdGrid()"></div>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px" id="cat-filters"></div>
+        <div class="prod-grid" id="prod-grid"></div>
+        <div id="weight-popup" class="weight-popup" style="display:none"></div>
+      </div>
+    </div>
+    <div class="dash-right">
+      <div class="card">
+        <div class="stitle"><i class="ti ti-shopping-cart"></i> Current Order</div>
+        <div id="dash-cart-items" style="min-height:48px;margin-bottom:10px"><div class="empty" style="padding:12px"><i class="ti ti-click"></i><p>Tap products to add</p></div></div>
+        <div class="divider" style="margin:8px 0"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-size:13px;color:var(--txm)">Total</span>
+          <span style="font-size:20px;font-weight:700;color:var(--gm);font-family:'Syne',sans-serif" id="dash-cart-total">$0.00</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="placeDashOrder()"><i class="ti ti-check"></i> Place Order</button>
+          <button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="clearDashCart()"><i class="ti ti-x"></i> Clear</button>
+        </div>
+        <div id="order-done-panel" style="display:none;margin-top:10px">
+          <div class="order-done">
+            <i class="ti ti-circle-check" style="font-size:26px;color:var(--gm);display:block;margin-bottom:5px"></i>
+            <div style="font-size:14px;font-weight:700;color:var(--gm)" id="done-id"></div>
+            <div style="font-size:12px;color:var(--txm);margin:3px 0 10px" id="done-info"></div>
+            <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+              <button class="btn btn-secondary btn-sm" onclick="printLastReceipt()"><i class="ti ti-printer"></i> Receipt</button>
+              <button class="btn btn-primary btn-sm" onclick="startNewOrder()"><i class="ti ti-plus"></i> New Order</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="stitle"><i class="ti ti-layout-kanban"></i> Active Orders</div>
+        <div id="home-active-orders"><div class="empty" style="padding:12px"><i class="ti ti-inbox"></i><p>No active orders</p></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PATIENTS ──────────────────────────────────────────────── -->
+<div id="view-patients" class="tab-content">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div class="stitle" style="margin:0"><i class="ti ti-users"></i> Patient Registry</div>
+    <button class="btn btn-primary" onclick="openModal('add-patient')"><i class="ti ti-plus"></i> Add Patient</button>
+  </div>
+  <div class="sbar" style="margin-bottom:12px"><i class="ti ti-search"></i><input type="text" placeholder="Search..." oninput="renderPatients(this.value)"></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Name</th><th>Phone</th><th>Medical Card</th><th>Gov ID</th><th>Photos</th><th>Added</th><th>Actions</th></tr></thead>
+    <tbody id="patient-table"></tbody>
+  </table></div>
+</div>
+
+<!-- ── INVENTORY ─────────────────────────────────────────────── -->
+<div id="view-inventory" class="tab-content">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div class="stitle" style="margin:0"><i class="ti ti-package"></i> Inventory</div>
+    <button class="btn btn-primary" onclick="openModal('add-item')"><i class="ti ti-plus"></i> Add Item</button>
+  </div>
+  <div class="sbar" style="margin-bottom:12px"><i class="ti ti-search"></i><input type="text" placeholder="Search inventory..." oninput="renderInventory(this.value)"></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Actions</th></tr></thead>
+    <tbody id="inventory-table"></tbody>
+  </table></div>
+</div>
+
+<!-- ── ORDERS ────────────────────────────────────────────────── -->
+<div id="view-orders" class="tab-content">
+  <div class="stitle"><i class="ti ti-layout-kanban"></i> All Orders</div>
+  <div class="kanban">
+    <div class="kcol"><div class="kcol-hdr"><span>Placed</span><span class="kcount" id="cnt-placed">0</span></div><div id="col-placed"></div></div>
+    <div class="kcol"><div class="kcol-hdr"><span>Ready</span><span class="kcount" id="cnt-ready">0</span></div><div id="col-ready"></div></div>
+    <div class="kcol"><div class="kcol-hdr"><span>Completed</span><span class="kcount" id="cnt-completed">0</span></div><div id="col-completed"></div></div>
+  </div>
+</div>
+
+<!-- ── SALES ─────────────────────────────────────────────────── -->
+<div id="view-sales" class="tab-content">
+  <div class="stitle"><i class="ti ti-chart-bar"></i> Sales Reports</div>
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="btn btn-primary" id="per-day" onclick="setPeriod('day')">Today</button>
+    <button class="btn btn-secondary" id="per-week" onclick="setPeriod('week')">This Week</button>
+    <button class="btn btn-secondary" id="per-month" onclick="setPeriod('month')">This Month</button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px" id="sales-stats"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div class="card"><div class="stitle"><i class="ti ti-chart-bar"></i> By Category</div><div id="cat-chart"></div></div>
+    <div class="card"><div class="stitle"><i class="ti ti-list"></i> Transactions</div><div id="sales-list"></div></div>
+  </div>
+</div>
+</main>
+
+<!-- ══ MODALS ═══════════════════════════════════════════════ -->
+
+<!-- Add Patient -->
+<div class="modal-overlay" id="modal-add-patient" style="display:none"><div class="modal">
+  <div class="modal-title">Add Patient <button class="btn btn-icon btn-secondary" onclick="closeModal('add-patient')"><i class="ti ti-x"></i></button></div>
+  <div class="fg2" style="gap:10px;margin-bottom:12px">
+    <div class="form-group"><label>First Name</label><input type="text" id="pt-fname"></div>
+    <div class="form-group"><label>Last Name</label><input type="text" id="pt-lname"></div>
+    <div class="form-group"><label>Phone</label><input type="tel" id="pt-phone"></div>
+    <div class="form-group"><label>Date of Birth</label><input type="date" id="pt-dob"></div>
+    <div class="form-group fg-full"><label>Medical Card #</label><input type="text" id="pt-card"></div>
+    <div class="form-group fg-full"><label>Gov. ID #</label><input type="text" id="pt-id"></div>
+    <div class="form-group fg-full"><label>Notes</label><input type="text" id="pt-notes"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div><div class="photo-label">Medical Card Photo</div><div class="photo-upload-area" onclick="document.getElementById('pt-card-photo').click()"><i class="ti ti-id" style="font-size:22px;color:var(--txd)"></i><div style="font-size:11px;color:var(--txm);margin-top:4px">Tap to upload</div><img id="pt-card-photo-preview" class="photo-thumb" style="display:none"></div><input type="file" id="pt-card-photo" accept="image/*" style="display:none" onchange="previewPhoto(this,'pt-card-photo-preview','pt-card-photo-data')"><input type="hidden" id="pt-card-photo-data"></div>
+    <div><div class="photo-label">Gov. ID Photo</div><div class="photo-upload-area" onclick="document.getElementById('pt-id-photo').click()"><i class="ti ti-license" style="font-size:22px;color:var(--txd)"></i><div style="font-size:11px;color:var(--txm);margin-top:4px">Tap to upload</div><img id="pt-id-photo-preview" class="photo-thumb" style="display:none"></div><input type="file" id="pt-id-photo" accept="image/*" style="display:none" onchange="previewPhoto(this,'pt-id-photo-preview','pt-id-photo-data')"><input type="hidden" id="pt-id-photo-data"></div>
+  </div>
+  <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('add-patient')">Cancel</button><button class="btn btn-primary" onclick="savePatient()"><i class="ti ti-check"></i> Save Patient</button></div>
+</div></div>
+
+<!-- Edit Patient -->
+<div class="modal-overlay" id="modal-edit-patient" style="display:none"><div class="modal">
+  <div class="modal-title">Edit Patient <button class="btn btn-icon btn-secondary" onclick="closeModal('edit-patient')"><i class="ti ti-x"></i></button></div>
+  <div class="fg2" style="gap:10px;margin-bottom:12px">
+    <div class="form-group"><label>First Name</label><input type="text" id="ept-fname"></div>
+    <div class="form-group"><label>Last Name</label><input type="text" id="ept-lname"></div>
+    <div class="form-group"><label>Phone</label><input type="tel" id="ept-phone"></div>
+    <div class="form-group"><label>Date of Birth</label><input type="date" id="ept-dob"></div>
+    <div class="form-group fg-full"><label>Medical Card #</label><input type="text" id="ept-card"></div>
+    <div class="form-group fg-full"><label>Gov. ID #</label><input type="text" id="ept-id"></div>
+    <div class="form-group fg-full"><label>Notes</label><input type="text" id="ept-notes"></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div><div class="photo-label">Medical Card Photo</div><div class="photo-upload-area" onclick="document.getElementById('ept-card-photo').click()"><i class="ti ti-id" style="font-size:22px;color:var(--txd)"></i><div style="font-size:11px;color:var(--txm);margin-top:4px">Tap to change</div><img id="ept-card-photo-preview" class="photo-thumb" style="display:none"></div><input type="file" id="ept-card-photo" accept="image/*" style="display:none" onchange="previewPhoto(this,'ept-card-photo-preview','ept-card-photo-data')"><input type="hidden" id="ept-card-photo-data"></div>
+    <div><div class="photo-label">Gov. ID Photo</div><div class="photo-upload-area" onclick="document.getElementById('ept-id-photo').click()"><i class="ti ti-license" style="font-size:22px;color:var(--txd)"></i><div style="font-size:11px;color:var(--txm);margin-top:4px">Tap to change</div><img id="ept-id-photo-preview" class="photo-thumb" style="display:none"></div><input type="file" id="ept-id-photo" accept="image/*" style="display:none" onchange="previewPhoto(this,'ept-id-photo-preview','ept-id-photo-data')"><input type="hidden" id="ept-id-photo-data"></div>
+  </div>
+  <input type="hidden" id="ept-idx">
+  <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('edit-patient')">Cancel</button><button class="btn btn-primary" onclick="updatePatient()"><i class="ti ti-check"></i> Update</button></div>
+</div></div>
+
+<!-- View Photos -->
+<div class="modal-overlay" id="modal-view-photos" style="display:none"><div class="modal">
+  <div class="modal-title" id="photo-modal-title">Photos <button class="btn btn-icon btn-secondary" onclick="closeModal('view-photos')"><i class="ti ti-x"></i></button></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div><div class="photo-label">Medical Card</div><div id="view-card-photo-wrap"></div></div>
+    <div><div class="photo-label">Gov. ID</div><div id="view-id-photo-wrap"></div></div>
+  </div>
+  <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('view-photos')">Close</button></div>
+</div></div>
+
+<!-- Add Inventory -->
+<div class="modal-overlay" id="modal-add-item" style="display:none"><div class="modal">
+  <div class="modal-title">Add Inventory Item <button class="btn btn-icon btn-secondary" onclick="closeModal('add-item')"><i class="ti ti-x"></i></button></div>
+  <div class="fg2" style="gap:10px;margin-bottom:12px">
+    <div class="form-group fg-full"><label>Product Name</label><input type="text" id="inv-name" placeholder="e.g. Blue Dream"></div>
+    <div class="form-group fg-full"><label>Category</label>
+      <select id="inv-cat" onchange="onCatChange('inv-cat','inv-flower-prices','inv-conc-prices','inv-std-price')">
+        <option>Flower</option><option>Smalls</option><option>Concentrate</option><option>Pre-Roll</option><option>Edible</option><option>Vape</option><option>Accessory</option>
+      </select>
+    </div>
+    <div class="form-group fg-full"><label>Description</label><input type="text" id="inv-desc" placeholder="Strain info, effects..."></div>
+  </div>
+  <div id="inv-flower-prices"><div style="font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:8px">Pricing by Weight</div><div class="fg2" style="gap:8px"><div class="form-group"><label>1/8 oz (3.5g)</label><input type="number" id="inv-p8" placeholder="0.00" step="0.01" min="0"></div><div class="form-group"><label>1/4 oz (7g)</label><input type="number" id="inv-p4" placeholder="0.00" step="0.01" min="0"></div><div class="form-group"><label>1/2 oz (14g)</label><input type="number" id="inv-p2" placeholder="0.00" step="0.01" min="0"></div><div class="form-group"><label>1 oz (28g)</label><input type="number" id="inv-p1" placeholder="0.00" step="0.01" min="0"></div></div></div>
+  <div id="inv-conc-prices" style="display:none"><div style="font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:8px">Pricing by Weight</div><div class="fg2" style="gap:8px"><div class="form-group"><label>1g</label><input type="number" id="inv-c1" placeholder="0.00" step="0.01" min="0"></div><div class="form-group"><label>1/8 oz (3.5g)</label><input type="number" id="inv-c8" placeholder="0.00" step="0.01" min="0"></div><div class="form-group"><label>1/4 oz (7g)</label><input type="number" id="inv-c4" placeholder="0.00" step="0.01" min="0"></div><div class="form-group"><label>1/2 oz (14g)</label><input type="number" id="inv-c2" placeholder="0.00" step="0.01" min="0"></div><div class="form-group"><label>1 oz (28g)</label><input type="number" id="inv-c1oz" placeholder="0.00" step="0.01" min="0"></div></div></div>
+  <div id="inv-std-price" style="display:none"><div class="form-group"><label>Price ($)</label><input type="number" id="inv-price" placeholder="0.00" step="0.01" min="0"></div></div>
+  <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('add-item')">Cancel</button><button class="btn btn-primary" onclick="saveItem()"><i class="ti ti-check"></i> Add Item</button></div>
+</div></div>
+
+<!-- Edit Inventory -->
+<div class="modal-overlay" id="modal-edit-item" style="display:none"><div class="modal">
+  <div class="modal-title">Edit Item <button class="btn btn-icon btn-secondary" onclick="closeModal('edit-item')"><i class="ti ti-x"></i></button></div>
+  <div class="fg2" style="gap:10px;margin-bottom:12px">
+    <div class="form-group fg-full"><label>Product Name</label><input type="text" id="einv-name"></div>
+    <div class="form-group fg-full"><label>Category</label>
+      <select id="einv-cat" onchange="onCatChange('einv-cat','einv-flower-prices','einv-conc-prices','einv-std-price')">
+        <option>Flower</option><option>Smalls</option><option>Concentrate</option><option>Pre-Roll</option><option>Edible</option><option>Vape</option><option>Accessory</option>
+      </select>
+    </div>
+    <div class="form-group fg-full"><label>Description</label><input type="text" id="einv-desc"></div>
+  </div>
+  <div id="einv-flower-prices"><div style="font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:8px">Pricing by Weight</div><div class="fg2" style="gap:8px"><div class="form-group"><label>1/8 oz</label><input type="number" id="einv-p8" step="0.01" min="0"></div><div class="form-group"><label>1/4 oz</label><input type="number" id="einv-p4" step="0.01" min="0"></div><div class="form-group"><label>1/2 oz</label><input type="number" id="einv-p2" step="0.01" min="0"></div><div class="form-group"><label>1 oz</label><input type="number" id="einv-p1" step="0.01" min="0"></div></div></div>
+  <div id="einv-conc-prices" style="display:none"><div style="font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:8px">Pricing by Weight</div><div class="fg2" style="gap:8px"><div class="form-group"><label>1g</label><input type="number" id="einv-c1" step="0.01" min="0"></div><div class="form-group"><label>1/8 oz</label><input type="number" id="einv-c8" step="0.01" min="0"></div><div class="form-group"><label>1/4 oz</label><input type="number" id="einv-c4" step="0.01" min="0"></div><div class="form-group"><label>1/2 oz</label><input type="number" id="einv-c2" step="0.01" min="0"></div><div class="form-group"><label>1 oz</label><input type="number" id="einv-c1oz" step="0.01" min="0"></div></div></div>
+  <div id="einv-std-price" style="display:none"><div class="form-group"><label>Price ($)</label><input type="number" id="einv-price" step="0.01" min="0"></div></div>
+  <input type="hidden" id="einv-idx">
+  <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('edit-item')">Cancel</button><button class="btn btn-primary" onclick="updateItem()"><i class="ti ti-check"></i> Update</button></div>
+</div></div>
+
+<!-- Edit Order -->
+<div class="modal-overlay" id="modal-edit-order" style="display:none"><div class="modal modal-wide">
+  <div style="margin-bottom:16px">
+    <div style="font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:4px">Editing Order</div>
+    <div style="font-size:22px;font-weight:800;font-family:'Syne',sans-serif;color:var(--tx);line-height:1.1" id="eo-patient-display">Walk-in</div>
+    <div style="font-size:12px;color:var(--txm);margin-top:2px" id="eo-patient-sub"></div>
+  </div>
+  <div class="fg2" style="gap:10px;margin-bottom:14px">
+    <div class="form-group"><label>Status</label><select id="eo-status"><option value="placed">Placed</option><option value="ready">Ready</option><option value="completed">Completed</option></select></div>
+    <div class="form-group"><label>Patient</label><select id="eo-patient" onchange="updateEoPatientDisplay()"></select></div>
+  </div>
+  <div style="font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:8px">Order Items</div>
+  <div id="eo-items-list" style="margin-bottom:14px"></div>
+  <div style="font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:8px">Add Product</div>
+  <div class="sbar" style="margin-bottom:8px"><i class="ti ti-search"></i><input type="text" id="eo-prod-search" placeholder="Search products to add..." oninput="renderEoProdSearch(this.value)" autocomplete="off"></div>
+  <div id="eo-prod-search-results" style="max-height:180px;overflow-y:auto;margin-bottom:10px"></div>
+  <div style="background:var(--sf2);border-radius:var(--r);padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+    <span style="font-size:13px;color:var(--txm)">Order Total</span>
+    <span style="font-size:18px;font-weight:700;color:var(--gm);font-family:'Syne',sans-serif" id="eo-total">$0.00</span>
+  </div>
+  <input type="hidden" id="eo-idx">
+  <div class="modal-actions">
+    <button class="btn btn-danger" onclick="deleteOrder()"><i class="ti ti-trash"></i> Delete</button>
+    <button class="btn btn-secondary btn-sm" onclick="printFromEditOrder()"><i class="ti ti-printer"></i> Print</button>
+    <button class="btn btn-secondary" onclick="closeModal('edit-order')">Cancel</button>
+    <button class="btn btn-primary" onclick="saveEditOrder()"><i class="ti ti-check"></i> Save Changes</button>
+  </div>
+</div></div>
+
+<!-- Receipt -->
+<div class="modal-overlay" id="modal-receipt" style="display:none"><div class="modal" style="max-width:380px">
+  <div class="modal-title">Receipt<div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--txm);font-weight:400">tap price to edit</span><button class="btn btn-icon btn-secondary" onclick="closeModal('receipt')"><i class="ti ti-x"></i></button></div></div>
+  <div id="receipt-header" style="margin-bottom:12px"></div>
+  <div style="font-size:11px;color:var(--txm);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-bottom:6px">Items</div>
+  <div id="receipt-line-items"></div>
+  <div class="divider"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <span style="font-size:14px;font-weight:600">Total</span>
+    <span style="font-size:20px;font-weight:700;color:var(--gm);font-family:'Syne',sans-serif" id="receipt-live-total">$0.00</span>
+  </div>
+  <div style="font-size:11px;color:var(--txm);text-align:center;margin-bottom:12px">Thank you for choosing Archer Farms.<br>For medical use only. Keep away from children.</div>
+  <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('receipt')">Close</button><button class="btn btn-primary" onclick="doPrint()"><i class="ti ti-printer"></i> Print</button></div>
+</div></div>
+
+<div id="receipt-print" hidden></div>
+<div class="toast" id="toast"><i class="ti ti-check"></i><span id="toast-msg"></span></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  SUPABASE CONFIG — paste your credentials here
+// ══════════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://kmujpdcxxgajtpnnqdat.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mXtUaSTfslmQ3HQKa84gwA_FiApoTwQ';
+
+let sb = null, useSupabase = false;
+try {
+  if (SUPABASE_URL && !SUPABASE_URL.startsWith('YOUR_')) {
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    useSupabase = true;
+    document.getElementById('db-indicator').textContent = 'Supabase';
+    document.getElementById('db-indicator').className = 'db-status connected';
+  }
+} catch(e) { console.warn('Supabase init failed, using localStorage', e); }
+if (!useSupabase) setTimeout(()=>alert('WARNING: Supabase is not connected. Data is only saved in THIS browser and will not be shared or kept safe.'), 500);
+
+// ══════════════════════════════════════════════════════════════
+//  DATA LAYER
+// ══════════════════════════════════════════════════════════════
+let patients = [], inventory = [], orders = [];
+let orderSeq = parseInt(localStorage.getItem('af_seq') || '1000');
+
+async function loadAll() {
+  if (useSupabase) {
+    const [p, inv, ord] = await Promise.all([
+      sb.from('patients').select('*').order('created_at'),
+      sb.from('inventory').select('*').order('created_at'),
+      sb.from('orders').select('*, order_items(*)').order('created_at')
+    ]);
+    const loadErr = p.error || inv.error || ord.error;
+    if (loadErr) throw loadErr;
+    patients  = (p.data   || []).map(fromDbPatient);
+    inventory = (inv.data || []).map(fromDbInventory);
+    orders    = (ord.data || []).map(fromDbOrder);
+    orders.forEach(o => { if (o.patientName && o.patientName !== 'Walk-in') { const i = patients.findIndex(p => `${p.fname||''} ${p.lname||''}`.trim() === o.patientName); if (i >= 0) o.patientIdx = i; } });
+  } else {
+    patients  = JSON.parse(localStorage.getItem('af_patients')  || '[]');
+    inventory = JSON.parse(localStorage.getItem('af_inventory') || '[]');
+    orders    = JSON.parse(localStorage.getItem('af_orders')    || '[]');
+  }
+}
+
+function fromDbPatient(r) {
+  return { id:r.id, fname:r.first_name||'', lname:r.last_name||'', phone:r.phone||'', dob:r.dob||'', card:r.med_card_number||'', govid:r.gov_id||'', notes:r.notes||'', cardPhoto:r.card_photo_url||'', idPhoto:r.id_photo_url||'', added:r.created_at };
+}
+function fromDbInventory(r) {
+  return { id:r.id, name:r.name, cat:r.category, desc:r.description||'', price:r.price, p8:r.price_eighth, p4:r.price_quarter, p2:r.price_half, p1:r.price_oz, c1:r.price_gram, c8:r.price_eighth, c4:r.price_quarter, c2:r.price_half, c1oz:r.price_oz, added:r.created_at };
+}
+function fromDbOrder(r) {
+  return { id:r.order_number||r.id, dbId:r.id, patientIdx:null, patientName:r.patient_name||'Walk-in', patientPhone:r.patient_phone||'', patientCard:r.patient_card||'', items:(r.order_items||[]).map(i=>({name:i.item_name,qty:i.quantity,price:parseFloat(i.unit_price)})), total:parseFloat(r.total||0), status:r.status||'placed', created:r.created_at, completedAt:r.completed_at, updated:r.updated_at };
+}
+function saveLocal() {
+  localStorage.setItem('af_patients',  JSON.stringify(patients));
+  localStorage.setItem('af_inventory', JSON.stringify(inventory));
+  localStorage.setItem('af_orders',    JSON.stringify(orders));
+  localStorage.setItem('af_seq',       orderSeq);
+}
+async function addPatient(data) {
+  if (useSupabase) {
+    const {data:row,error} = await sb.from('patients').insert({first_name:data.fname,last_name:data.lname,phone:data.phone,dob:data.dob||null,med_card_number:data.card,gov_id:data.govid,notes:data.notes,card_photo_url:data.cardPhoto||null,id_photo_url:data.idPhoto||null}).select().single();
+    if (error) throw error;
+    patients.push(fromDbPatient(row));
+  } else {
+    patients.push({...data, added:new Date().toISOString()});
+    saveLocal();
+  }
+}
+async function updatePatientData(idx, data) {
+  const p = patients[idx];
+  if (useSupabase && p.id) {
+    const {data:rows,error} = await sb.from('patients').update({first_name:data.fname,last_name:data.lname,phone:data.phone,dob:data.dob||null,med_card_number:data.card,gov_id:data.govid,notes:data.notes,card_photo_url:data.cardPhoto||p.cardPhoto||null,id_photo_url:data.idPhoto||p.idPhoto||null}).eq('id',p.id).select();
+    if (error) throw error; if (!rows||!rows.length) throw new Error('Update blocked - check Supabase RLS policies');
+  }
+  patients[idx] = {...p, ...data};
+  if (!useSupabase) saveLocal();
+}
+async function deletePatientData(idx) {
+  const p = patients[idx];
+  if (useSupabase && p.id) { const {error} = await sb.from('patients').delete().eq('id',p.id); if (error) throw error; }
+  patients.splice(idx, 1);
+  if (!useSupabase) saveLocal();
+}
+async function addInventoryItem(data) {
+  if (useSupabase) {
+    const {data:row,error} = await sb.from('inventory').insert({name:data.name,category:data.cat,description:data.desc,price:data.price||null,price_eighth:data.p8||data.c8||null,price_quarter:data.p4||data.c4||null,price_half:data.p2||data.c2||null,price_oz:data.p1||data.c1oz||null,price_gram:data.c1||null}).select().single();
+    if (error) throw error;
+    inventory.push(fromDbInventory(row));
+  } else {
+    inventory.push({...data, added:new Date().toISOString()});
+    saveLocal();
+  }
+}
+async function updateInventoryItem(idx, data) {
+  const it = inventory[idx];
+  if (useSupabase && it.id) {
+    const {data:rows,error} = await sb.from('inventory').update({name:data.name,category:data.cat,description:data.desc,price:data.price||null,price_eighth:data.p8||data.c8||null,price_quarter:data.p4||data.c4||null,price_half:data.p2||data.c2||null,price_oz:data.p1||data.c1oz||null,price_gram:data.c1||null}).eq('id',it.id).select();
+    if (error) throw error; if (!rows||!rows.length) throw new Error('Update blocked - check Supabase RLS policies');
+  }
+  inventory[idx] = {...it, ...data};
+  if (!useSupabase) saveLocal();
+}
+async function deleteInventoryItem(idx) {
+  const it = inventory[idx];
+  if (useSupabase && it.id) { const {error} = await sb.from('inventory').delete().eq('id',it.id); if (error) throw error; }
+  inventory.splice(idx, 1);
+  if (!useSupabase) saveLocal();
+}
+async function addOrder(data) {
+  if (useSupabase) {
+    const {data:row,error} = await sb.from('orders').insert({order_number:data.id,patient_name:data.patientName,patient_phone:data.patientPhone,patient_card:data.patientCard,total:data.total,status:data.status}).select().single();
+    if (error) throw error;
+    if (data.items.length) { const {error:ie} = await sb.from('order_items').insert(data.items.map(i=>({order_id:row.id,item_name:i.name,quantity:i.qty,unit_price:i.price}))); if (ie) throw ie; }
+    orders.push({...data, dbId:row.id});
+  } else {
+    orders.push(data);
+    saveLocal();
+  }
+}
+async function updateOrderData(idx, data) {
+  const o = orders[idx];
+  if (useSupabase && o.dbId) {
+    const {data:rows,error} = await sb.from('orders').update({patient_name:data.patientName,patient_phone:data.patientPhone,patient_card:data.patientCard,total:data.total,status:data.status,completed_at:data.completedAt||null,updated_at:new Date().toISOString()}).eq('id',o.dbId).select();
+    if (error) throw error; if (!rows||!rows.length) throw new Error('Update blocked - check Supabase RLS policies');
+    const {error:de} = await sb.from('order_items').delete().eq('order_id',o.dbId); if (de) throw de;
+    if (data.items.length) { const {error:ie} = await sb.from('order_items').insert(data.items.map(i=>({order_id:o.dbId,item_name:i.name,quantity:i.qty,unit_price:i.price}))); if (ie) throw ie; }
+  }
+  orders[idx] = {...o, ...data};
+  if (!useSupabase) saveLocal();
+}
+async function deleteOrderData(idx) {
+  const o = orders[idx];
+  if (useSupabase && o.dbId) { const {error:de} = await sb.from('order_items').delete().eq('order_id',o.dbId); if (de) throw de; const {error} = await sb.from('orders').delete().eq('id',o.dbId); if (error) throw error; }
+  orders.splice(idx, 1);
+  if (!useSupabase) saveLocal();
+}
+function nextId() {
+  // Derive from existing orders so devices sharing one database never reuse an ID
+  const max = orders.reduce((m,o)=>{ const n=parseInt(String(o.id).replace(/\D/g,'')); return isNaN(n)?m:Math.max(m,n); }, 1000);
+  orderSeq = Math.max(orderSeq, max) + 1;
+  if (!useSupabase) localStorage.setItem('af_seq', orderSeq);
+  return 'AF-' + orderSeq;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  APP STATE
+// ══════════════════════════════════════════════════════════════
+let currentPeriod='day', dashCart=[], dashPatient=null, activeCat='All';
+let lastOrderIdx=null, currentReceiptIdx=null, receiptEditItems=[], eoWorkingItems=[];
+const FW = [{label:'1/8 oz',sub:'3.5g',key:'p8'},{label:'1/4 oz',sub:'7g',key:'p4'},{label:'1/2 oz',sub:'14g',key:'p2'},{label:'1 oz',sub:'28g',key:'p1'}];
+const CW = [{label:'1g',sub:'1g',key:'c1'},{label:'1/8 oz',sub:'3.5g',key:'c8'},{label:'1/4 oz',sub:'7g',key:'c4'},{label:'1/2 oz',sub:'14g',key:'c2'},{label:'1 oz',sub:'28g',key:'c1oz'}];
+const FC=['Flower','Smalls'], CC=['Concentrate'], WC=[...FC,...CC];
+function gw(cat) { return FC.includes(cat)?FW : CC.includes(cat)?CW : []; }
+
+// ── UTILS ───────────────────────────────────────────────────
+function toast(msg, err) { const t=document.getElementById('toast'); t.style.background=err?'var(--danger)':'var(--g)'; document.getElementById('toast-msg').textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
+function updateClock() { const n=new Date(); document.getElementById('clock').textContent=n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})+' — '+n.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
+updateClock(); setInterval(updateClock, 1000);
+function goTab(name) { document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active')); document.querySelectorAll('nav button').forEach(e=>e.classList.remove('active')); document.getElementById('view-'+name).classList.add('active'); document.getElementById('tab-'+name).classList.add('active'); hideWeightPopup(); if(name==='patients')renderPatients(); if(name==='inventory')renderInventory(); if(name==='orders')renderOrders(); if(name==='dashboard')renderDashboard(); if(name==='sales')renderSales(); }
+function openModal(n) { document.getElementById('modal-'+n).style.display='flex'; }
+function closeModal(n) { document.getElementById('modal-'+n).style.display='none'; }
+document.addEventListener('click', function(e) { const pop=document.getElementById('weight-popup'); if(pop&&!pop.hidden&&!pop.contains(e.target)&&!e.target.closest('.prod-tile')) hideWeightPopup(); });
+function onCatChange(cid,fid,coid,sid) { const cat=document.getElementById(cid).value; document.getElementById(fid).style.display=FC.includes(cat)?'block':'none'; document.getElementById(coid).style.display=CC.includes(cat)?'block':'none'; document.getElementById(sid).style.display=WC.includes(cat)?'none':'block'; }
+function previewPhoto(input, pid, did) { const file=input.files[0]; if(!file) return; const r=new FileReader(); r.onload=function(e) { const p=document.getElementById(pid); p.src=e.target.result; p.style.display='block'; document.getElementById(did).value=e.target.result; }; r.readAsDataURL(file); }
+function statusBadge(s) { if(s==='placed') return'<span class="badge bg-blue">Placed</span>'; if(s==='ready') return'<span class="badge bg-gold">Ready</span>'; return'<span class="badge bg-green">Completed</span>'; }
+
+// ── PATIENT SEARCH (DASH) ───────────────────────────────────
+function searchPatientDash(q) { const res=document.getElementById('pt-search-results'); if(!q.trim()){res.innerHTML='';return;} const m=patients.filter(p=>`${p.fname} ${p.lname} ${p.phone}`.toLowerCase().includes(q.toLowerCase())).slice(0,5); if(!m.length){res.innerHTML='<div style="font-size:12px;color:var(--txm);padding:5px">No matches</div>';return;} res.innerHTML=m.map(p=>{const idx=patients.indexOf(p);const name=`${p.fname||''} ${p.lname||''}`.trim()||'Patient';return`<div class="pt-result" onclick="selectPatient(${idx})"><div><div style="font-size:13px;font-weight:600">${name}</div><div style="font-size:11px;color:var(--txm)">${p.phone||''}${p.card?' · '+p.card:''}</div></div><i class="ti ti-chevron-right" style="color:var(--txd)"></i></div>`;}).join(''); }
+function selectPatient(idx) { dashPatient=idx; const p=patients[idx]; const name=`${p.fname||''} ${p.lname||''}`.trim()||'Patient'; document.getElementById('pt-search-results').innerHTML=''; document.getElementById('pt-search-dash').value=''; document.getElementById('selected-pt-banner').innerHTML=`<div class="selected-pt"><div><div style="font-size:13px;font-weight:600">${name}</div><div style="font-size:11px;color:var(--txm)">${p.phone||''}${p.card?' · '+p.card:''}</div></div><button class="btn btn-sm btn-secondary" onclick="clearPatient()"><i class="ti ti-x"></i></button></div>`; }
+function clearPatient() { dashPatient=null; document.getElementById('selected-pt-banner').innerHTML=''; }
+function toggleQuickAdd() { const f=document.getElementById('quick-add-form'); f.style.display=f.style.display==='none'?'block':'none'; }
+async function saveQuickPatient() { await addPatient({fname:document.getElementById('qpt-fname').value.trim(),lname:document.getElementById('qpt-lname').value.trim(),phone:document.getElementById('qpt-phone').value.trim(),dob:document.getElementById('qpt-dob').value,card:document.getElementById('qpt-card').value.trim(),govid:document.getElementById('qpt-id').value.trim(),notes:'',cardPhoto:'',idPhoto:''}); selectPatient(patients.length-1); toggleQuickAdd(); renderDashboard(); toast('Patient saved & selected'); ['qpt-fname','qpt-lname','qpt-phone','qpt-dob','qpt-card','qpt-id'].forEach(i=>document.getElementById(i).value=''); }
+
+// ── PRODUCT GRID ────────────────────────────────────────────
+function showWeightPopup(invIdx, tileEl) { const it=inventory[invIdx]; hideWeightPopup(); const weights=gw(it.cat); const opts=weights.filter(w=>it[w.key]&&parseFloat(it[w.key])>0); if(!opts.length){toast('No prices set','err');return;} const pop=document.getElementById('weight-popup'); pop.innerHTML=`<div style="font-size:11px;color:var(--txm);padding:2px 10px 6px;font-weight:600;text-transform:uppercase;letter-spacing:.4px">${it.name}</div>`+opts.map(w=>`<div class="weight-opt" onclick="addWeightToCart(${invIdx},'${w.key}','${w.label}',${it[w.key]})"><span style="font-weight:500">${w.label} <span style="font-size:10px;color:var(--txm)">(${w.sub})</span></span><span style="color:var(--gm);font-weight:700;font-size:13px">$${parseFloat(it[w.key]).toFixed(2)}</span></div>`).join(''); pop.hidden=false; const rect=tileEl.getBoundingClientRect(); const area=document.querySelector('.prod-area').getBoundingClientRect(); let left=rect.left-area.left, top=rect.bottom-area.top+4; if(left+190>area.width) left=area.width-190; pop.style.left=Math.max(0,left)+'px'; pop.style.top=top+'px'; }
+function hideWeightPopup() { document.getElementById('weight-popup').hidden=true; }
+function addWeightToCart(invIdx, wk, label, price) { const it=inventory[invIdx]; const ck=invIdx+'_'+wk; const ex=dashCart.find(c=>c.cartKey===ck); if(ex){ex.qty++;}else{dashCart.push({cartKey:ck,invIdx,weightKey:wk,qty:1,name:it.name+' — '+label,price:parseFloat(price)});} hideWeightPopup(); renderProdGrid(); renderDashCart(); }
+function renderCatFilters() { const cats=['All',...new Set(inventory.map(i=>i.cat))]; document.getElementById('cat-filters').innerHTML=cats.map(c=>`<button class="btn btn-sm ${c===activeCat?'btn-primary':'btn-secondary'}" onclick="setCatFilter('${c}')">${c}</button>`).join(''); }
+function setCatFilter(cat) { activeCat=cat; renderCatFilters(); renderProdGrid(); }
+function renderProdGrid() { const q=(document.getElementById('prod-search')||{}).value||''; const grid=document.getElementById('prod-grid'); const items=inventory.filter(it=>{const mc=activeCat==='All'||it.cat===activeCat;const mq=!q||it.name.toLowerCase().includes(q.toLowerCase())||it.cat.toLowerCase().includes(q.toLowerCase());return mc&&mq;}); if(!items.length){grid.innerHTML='<div class="empty" style="grid-column:1/-1"><i class="ti ti-package-off"></i><p>No products found</p></div>';return;} grid.innerHTML=items.map(it=>{const idx=inventory.indexOf(it);const isW=WC.includes(it.cat);const cq=dashCart.filter(c=>c.invIdx===idx).reduce((s,c)=>s+c.qty,0);let pd='';if(isW){const fw=gw(it.cat).find(w=>it[w.key]&&parseFloat(it[w.key])>0);pd=fw?'from $'+parseFloat(it[fw.key]).toFixed(2):'No price';}else{pd=it.price?'$'+parseFloat(it.price).toFixed(2):'—';}return`<button class="prod-tile ${cq>0?'in-cart':''}" onclick="${isW?`showWeightPopup(${idx},this)`:`addSimpleToCart(${idx})`}"><div class="prod-name">${it.name}</div><div class="prod-cat">${it.cat}</div><div style="display:flex;align-items:center;justify-content:space-between;gap:3px"><span class="prod-price">${pd}</span>${cq>0?`<span style="font-size:10px;color:var(--gm);font-weight:700">×${cq}</span>`:''}${isW?'<i class="ti ti-chevron-down" style="font-size:10px;color:var(--txm)"></i>':''}</div></button>`;}).join(''); }
+function addSimpleToCart(invIdx) { const it=inventory[invIdx]; const ck=invIdx+'_std'; const ex=dashCart.find(c=>c.cartKey===ck); if(ex){ex.qty++;}else{dashCart.push({cartKey:ck,invIdx,weightKey:'std',qty:1,name:it.name,price:parseFloat(it.price)||0});} renderProdGrid(); renderDashCart(); }
+
+// ── CART ────────────────────────────────────────────────────
+function renderDashCart() { const el=document.getElementById('dash-cart-items'); const tel=document.getElementById('dash-cart-total'); if(!dashCart.length){el.innerHTML='<div class="empty" style="padding:12px"><i class="ti ti-click"></i><p>Tap products to add</p></div>';tel.textContent='$0.00';return;} let total=0; el.innerHTML=dashCart.map(c=>{const sub=c.price*c.qty;total+=sub;return`<div class="cart-item"><div style="flex:1;font-size:12px;font-weight:500;line-height:1.3">${c.name}</div><div class="qty-ctrl"><button class="qty-btn" onclick="adjustCart('${c.cartKey}',-1)">−</button><span style="font-size:13px;font-weight:600;min-width:16px;text-align:center">${c.qty}</span><button class="qty-btn" onclick="adjustCart('${c.cartKey}',1)">+</button></div><span style="font-size:12px;color:var(--gm);font-weight:600;min-width:50px;text-align:right">$${sub.toFixed(2)}</span></div>`;}).join(''); tel.textContent='$'+total.toFixed(2); }
+function adjustCart(ck, delta) { const c=dashCart.find(c=>c.cartKey===ck); if(!c) return; c.qty+=delta; if(c.qty<=0) dashCart.splice(dashCart.indexOf(c),1); renderProdGrid(); renderDashCart(); }
+function clearDashCart() { dashCart=[]; document.getElementById('order-done-panel').style.display='none'; renderProdGrid(); renderDashCart(); }
+async function placeDashOrder() { if(!dashCart.length){toast('Add items to cart','err');return;} const p=dashPatient!==null?patients[dashPatient]:null; const name=p?`${p.fname||''} ${p.lname||''}`.trim()||'Walk-in':'Walk-in'; const items=dashCart.map(c=>({cartKey:c.cartKey,invIdx:c.invIdx,weightKey:c.weightKey,qty:c.qty,name:c.name,price:c.price})); const total=dashCart.reduce((s,c)=>s+c.price*c.qty,0); const ord={id:nextId(),patientIdx:dashPatient,patientName:name,patientPhone:p?p.phone:'',patientCard:p?p.card:'',items,total,status:'placed',created:new Date().toISOString()}; try{await addOrder(ord);lastOrderIdx=orders.length-1;document.getElementById('done-id').textContent=ord.id+' — $'+total.toFixed(2);document.getElementById('done-info').textContent=name+' · '+items.length+' item(s)';document.getElementById('order-done-panel').style.display='block';dashCart=[];clearPatient();renderProdGrid();renderDashCart();renderDashboard();toast(ord.id+' placed!');}catch(e){toast('Error saving order','err');console.error(e);} }
+function startNewOrder() { document.getElementById('order-done-panel').style.display='none'; clearDashCart(); clearPatient(); }
+function printLastReceipt() { if(lastOrderIdx!==null) printReceiptByIdx(lastOrderIdx); }
+
+// ── HOME ACTIVE ORDERS ──────────────────────────────────────
+function renderHomeActiveOrders() { const active=orders.filter(o=>o.status==='placed'||o.status==='ready'); const el=document.getElementById('home-active-orders'); if(!active.length){el.innerHTML='<div class="empty" style="padding:12px"><i class="ti ti-inbox"></i><p>No active orders</p></div>';return;} el.innerHTML=active.map(o=>{const idx=orders.indexOf(o);const ns=o.status==='placed'?'ready':'completed';const nl=o.status==='placed'?'Mark Ready':'Complete';const nc=o.status==='placed'?'btn-gold':'btn-primary';const ni=o.status==='placed'?'ti-checks':'ti-circle-check';return`<div style="background:var(--bg);border:1px solid var(--bd);border-radius:var(--r);padding:11px;margin-bottom:8px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><div><div style="font-size:15px;font-weight:700;font-family:'Syne',sans-serif">${o.patientName}</div><div style="font-size:11px;color:var(--txm)">${o.id}</div></div><span class="status-pill ${o.status}">${o.status}</span></div><div style="font-size:12px;color:var(--txm);margin-bottom:7px">${o.items.map(i=>`${i.name} ×${i.qty}`).join(', ')}</div><div style="display:flex;align-items:center;justify-content:space-between;gap:6px"><span style="font-size:14px;font-weight:700;color:var(--gm)">$${o.total.toFixed(2)}</span><div style="display:flex;gap:5px"><button class="btn btn-sm btn-secondary" onclick="openEditOrder(${idx})"><i class="ti ti-edit"></i></button><button class="btn btn-sm btn-secondary" onclick="printReceiptByIdx(${idx})"><i class="ti ti-printer"></i></button><button class="btn btn-sm ${nc}" onclick="advanceOrder(${idx},'${ns}')"><i class="ti ${ni}"></i> ${nl}</button></div></div></div>`;}).join(''); }
+async function advanceOrder(idx, ns) { try{await updateOrderData(idx,{...orders[idx],status:ns,completedAt:ns==='completed'?new Date().toISOString():orders[idx].completedAt});renderDashboard();renderSales();toast('Order '+orders[idx].id+' → '+ns);}catch(e){toast('Error updating order','err');console.error(e);} }
+
+// ── EDIT ORDER ──────────────────────────────────────────────
+function updateEoPatientDisplay() { const pIdx=parseInt(document.getElementById('eo-patient').value); const p=pIdx>=0?patients[pIdx]:null; const name=p?`${p.fname||''} ${p.lname||''}`.trim()||'Walk-in':'Walk-in'; document.getElementById('eo-patient-display').textContent=name; document.getElementById('eo-patient-sub').textContent=p?(p.phone||'')+(p.card?' · Card: '+p.card:''):''; }
+function openEditOrder(idx) { const o=orders[idx]; document.getElementById('eo-idx').value=idx; document.getElementById('eo-status').value=o.status; const pSel=document.getElementById('eo-patient'); pSel.innerHTML='<option value="-1">Walk-in</option>'+patients.map((p,i)=>{const name=`${p.fname||''} ${p.lname||''}`.trim()||'Patient';return`<option value="${i}">${name}${p.phone?' ('+p.phone+')':''}</option>`;}).join(''); pSel.value=o.patientIdx!==null&&o.patientIdx!==undefined?o.patientIdx:-1; updateEoPatientDisplay(); eoWorkingItems=o.items.map(it=>({...it,price:parseFloat(it.price)})); renderEoItems(); document.getElementById('eo-prod-search').value=''; document.getElementById('eo-prod-search-results').innerHTML=''; openModal('edit-order'); }
+function renderEoItems() { const el=document.getElementById('eo-items-list'); if(!eoWorkingItems.length){el.innerHTML='<div style="font-size:12px;color:var(--txm);padding:6px 0">No items — add products below</div>';refreshEoTotal();return;} el.innerHTML=eoWorkingItems.map((it,i)=>`<div class="edit-order-item"><div class="eoi-name">${it.name}</div><div class="qty-ctrl" style="gap:4px"><button class="qty-btn" onclick="eoAdjQty(${i},-1)">−</button><span style="font-size:13px;font-weight:600;min-width:20px;text-align:center">${it.qty}</span><button class="qty-btn" onclick="eoAdjQty(${i},1)">+</button></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--txm)">ea $</span><input class="eoi-price-input" type="number" step="0.01" min="0" value="${it.price.toFixed(2)}" oninput="eoUpdPrice(${i},this.value)"></div><div class="eoi-sub" id="eoisub-${i}">$${(it.price*it.qty).toFixed(2)}</div><button class="btn btn-icon btn-danger btn-sm" onclick="eoRemove(${i})"><i class="ti ti-x"></i></button></div>`).join(''); refreshEoTotal(); }
+function eoAdjQty(i,d) { eoWorkingItems[i].qty+=d; if(eoWorkingItems[i].qty<=0) eoWorkingItems.splice(i,1); renderEoItems(); }
+function eoUpdPrice(i,val) { const v=parseFloat(val); if(!isNaN(v)&&v>=0){eoWorkingItems[i].price=v;const s=document.getElementById('eoisub-'+i);if(s)s.textContent='$'+(v*eoWorkingItems[i].qty).toFixed(2);} refreshEoTotal(); }
+function eoRemove(i) { eoWorkingItems.splice(i,1); renderEoItems(); }
+function refreshEoTotal() { const t=eoWorkingItems.reduce((s,it)=>s+parseFloat(it.price)*it.qty,0); document.getElementById('eo-total').textContent='$'+t.toFixed(2); }
+function renderEoProdSearch(q) { const el=document.getElementById('eo-prod-search-results'); if(!q.trim()){el.innerHTML='';return;} const matches=inventory.filter(it=>it.name.toLowerCase().includes(q.toLowerCase())||it.cat.toLowerCase().includes(q.toLowerCase())).slice(0,8); if(!matches.length){el.innerHTML='<div style="font-size:12px;color:var(--txm);padding:6px">No products found</div>';return;} el.innerHTML=matches.map(it=>{const idx=inventory.indexOf(it);const isW=WC.includes(it.cat);if(isW){const weights=gw(it.cat);const opts=weights.filter(w=>it[w.key]&&parseFloat(it[w.key])>0);return`<div class="eo-prod-result" style="cursor:default;flex-direction:column;align-items:flex-start"><div style="display:flex;align-items:center;justify-content:space-between;width:100%"><div><div style="font-size:13px;font-weight:500">${it.name}</div><div style="font-size:11px;color:var(--txm)">${it.cat}</div></div></div><div class="eo-weight-list">${opts.map(w=>`<button class="btn btn-sm btn-secondary" onclick="eoAddWeight(${idx},'${w.key}','${w.label}',${it[w.key]})" style="font-size:11px">${w.label} — $${parseFloat(it[w.key]).toFixed(2)}</button>`).join('')}</div></div>`;}else{return`<div class="eo-prod-result" onclick="eoAddSimple(${idx})"><div><div style="font-size:13px;font-weight:500">${it.name}</div><div style="font-size:11px;color:var(--txm)">${it.cat}</div></div><span style="color:var(--gm);font-weight:700;font-size:13px">$${parseFloat(it.price||0).toFixed(2)}</span></div>`;}}).join(''); }
+function eoAddWeight(invIdx,wk,label,price) { const it=inventory[invIdx];const name=it.name+' — '+label;const ex=eoWorkingItems.find(i=>i.name===name);if(ex){ex.qty++;}else{eoWorkingItems.push({name,price:parseFloat(price),qty:1,invIdx,weightKey:wk});}renderEoItems();document.getElementById('eo-prod-search').value='';document.getElementById('eo-prod-search-results').innerHTML='';toast(name+' added'); }
+function eoAddSimple(invIdx) { const it=inventory[invIdx];const ex=eoWorkingItems.find(i=>i.name===it.name&&!i.weightKey);if(ex){ex.qty++;}else{eoWorkingItems.push({name:it.name,price:parseFloat(it.price)||0,qty:1,invIdx});}renderEoItems();document.getElementById('eo-prod-search').value='';document.getElementById('eo-prod-search-results').innerHTML='';toast(it.name+' added'); }
+async function saveEditOrder() { const idx=parseInt(document.getElementById('eo-idx').value);const status=document.getElementById('eo-status').value;const pIdx=parseInt(document.getElementById('eo-patient').value);const p=pIdx>=0?patients[pIdx]:null;const total=eoWorkingItems.reduce((s,it)=>s+parseFloat(it.price)*it.qty,0);const data={...orders[idx],status,patientIdx:pIdx>=0?pIdx:null,patientName:p?`${p.fname||''} ${p.lname||''}`.trim()||'Walk-in':'Walk-in',patientPhone:p?p.phone:'',patientCard:p?p.card:'',items:[...eoWorkingItems.map(it=>({...it,price:parseFloat(it.price)}))],total,updated:new Date().toISOString()};if(status==='completed'&&!data.completedAt)data.completedAt=new Date().toISOString();try{await updateOrderData(idx,data);closeModal('edit-order');renderOrders();renderDashboard();renderSales();toast('Order '+orders[idx].id+' saved');}catch(e){toast('Error saving order','err');console.error(e);} }
+function printFromEditOrder() { const idx=parseInt(document.getElementById('eo-idx').value); closeModal('edit-order'); printReceiptByIdx(idx); }
+async function deleteOrder() { const idx=parseInt(document.getElementById('eo-idx').value); if(!confirm('Delete this order?')) return; try{await deleteOrderData(idx);closeModal('edit-order');renderOrders();renderDashboard();toast('Order deleted');}catch(e){toast('Error deleting order','err');console.error(e);} }
+
+// ── ORDERS KANBAN ───────────────────────────────────────────
+function renderOrders() { const cols={placed:'',ready:'',completed:''}; const cnts={placed:0,ready:0,completed:0}; orders.forEach((o,idx)=>{cnts[o.status]++;cols[o.status]+=`<div class="ocard"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:7px"><div><div class="ocard-patient">${o.patientName}</div><div class="ocard-id">${o.id}${o.updated?' · edited':''}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">${statusBadge(o.status)}<div style="display:flex;gap:4px;margin-top:2px"><button class="btn btn-sm btn-secondary" onclick="printReceiptByIdx(${idx})"><i class="ti ti-printer"></i></button><button class="btn btn-sm btn-secondary" onclick="openEditOrder(${idx})"><i class="ti ti-edit"></i> Edit</button></div></div></div><div style="border-top:1px solid var(--bd);padding-top:7px">${o.items.map(it=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span>${it.name} ×${it.qty}</span><span style="color:var(--txm)">$${(it.price*it.qty).toFixed(2)}</span></div>`).join('')}<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-top:5px;padding-top:5px;border-top:1px solid var(--bd)"><span>Total</span><span style="color:var(--gm)">$${o.total.toFixed(2)}</span></div></div><div style="font-size:10px;color:var(--txd);margin-top:5px">${new Date(o.created).toLocaleString()}</div></div>`;}); ['placed','ready','completed'].forEach(s=>{document.getElementById('col-'+s).innerHTML=cols[s]||`<div class="empty"><i class="ti ti-inbox"></i><p>No orders</p></div>`;document.getElementById('cnt-'+s).textContent=cnts[s];}); }
+
+// ── PATIENTS ────────────────────────────────────────────────
+async function savePatient() { try{await addPatient({fname:document.getElementById('pt-fname').value.trim(),lname:document.getElementById('pt-lname').value.trim(),phone:document.getElementById('pt-phone').value.trim(),dob:document.getElementById('pt-dob').value,card:document.getElementById('pt-card').value.trim(),govid:document.getElementById('pt-id').value.trim(),notes:document.getElementById('pt-notes').value,cardPhoto:document.getElementById('pt-card-photo-data').value,idPhoto:document.getElementById('pt-id-photo-data').value});closeModal('add-patient');renderPatients();toast('Patient added');['pt-fname','pt-lname','pt-phone','pt-dob','pt-card','pt-id','pt-notes','pt-card-photo-data','pt-id-photo-data'].forEach(i=>document.getElementById(i).value='');['pt-card-photo-preview','pt-id-photo-preview'].forEach(i=>document.getElementById(i).style.display='none');}catch(e){toast('Error saving patient','err');console.error(e);} }
+function openEditPatient(idx) { const p=patients[idx]; ['fname','lname','phone','dob','card','notes'].forEach(f=>document.getElementById('ept-'+f).value=p[f]||''); document.getElementById('ept-id').value=p.govid||''; document.getElementById('ept-idx').value=idx; const cp=document.getElementById('ept-card-photo-preview'); document.getElementById('ept-card-photo-data').value=p.cardPhoto||''; if(p.cardPhoto){cp.src=p.cardPhoto;cp.style.display='block';}else{cp.style.display='none';} const ip=document.getElementById('ept-id-photo-preview'); document.getElementById('ept-id-photo-data').value=p.idPhoto||''; if(p.idPhoto){ip.src=p.idPhoto;ip.style.display='block';}else{ip.style.display='none';} openModal('edit-patient'); }
+async function updatePatient() { const idx=parseInt(document.getElementById('ept-idx').value); try{await updatePatientData(idx,{fname:document.getElementById('ept-fname').value.trim(),lname:document.getElementById('ept-lname').value.trim(),phone:document.getElementById('ept-phone').value.trim(),dob:document.getElementById('ept-dob').value,card:document.getElementById('ept-card').value.trim(),govid:document.getElementById('ept-id').value.trim(),notes:document.getElementById('ept-notes').value,cardPhoto:document.getElementById('ept-card-photo-data').value||patients[idx].cardPhoto||'',idPhoto:document.getElementById('ept-id-photo-data').value||patients[idx].idPhoto||''});closeModal('edit-patient');renderPatients();toast('Patient updated');}catch(e){toast('Error updating patient','err');console.error(e);} }
+async function deletePatient(idx) { if(!confirm('Delete this patient?')) return; try{await deletePatientData(idx);renderPatients();toast('Patient removed');}catch(e){toast('Error deleting patient','err');console.error(e);} }
+function viewPatientPhotos(idx) { const p=patients[idx]; document.getElementById('photo-modal-title').innerHTML=`${p.fname||''} ${p.lname||''} Photos <button class="btn btn-icon btn-secondary" onclick="closeModal('view-photos')"><i class="ti ti-x"></i></button>`; document.getElementById('view-card-photo-wrap').innerHTML=p.cardPhoto?`<img src="${p.cardPhoto}" style="width:100%;border-radius:8px;border:1px solid var(--bd)">`:`<div class="empty" style="padding:16px;border:1px dashed var(--bd);border-radius:var(--r)"><i class="ti ti-id"></i><p>No photo</p></div>`; document.getElementById('view-id-photo-wrap').innerHTML=p.idPhoto?`<img src="${p.idPhoto}" style="width:100%;border-radius:8px;border:1px solid var(--bd)">`:`<div class="empty" style="padding:16px;border:1px dashed var(--bd);border-radius:var(--r)"><i class="ti ti-license"></i><p>No photo</p></div>`; openModal('view-photos'); }
+function renderPatients(q='') { const filtered=patients.filter(p=>`${p.fname} ${p.lname} ${p.phone} ${p.card}`.toLowerCase().includes(q.toLowerCase())); const tb=document.getElementById('patient-table'); if(!filtered.length){tb.innerHTML=`<tr><td colspan="7"><div class="empty" style="padding:20px"><i class="ti ti-users-off"></i><p>${q?'No matches':'No patients yet'}</p></div></td></tr>`;return;} tb.innerHTML=filtered.map(p=>{const idx=patients.indexOf(p);const name=`${p.fname||''} ${p.lname||''}`.trim()||'—';const hp=p.cardPhoto||p.idPhoto;return`<tr><td><strong>${name}</strong></td><td>${p.phone||'—'}</td><td style="font-size:12px;color:var(--txm)">${p.card||'—'}</td><td style="font-size:12px;color:var(--txm)">${p.govid||'—'}</td><td><button class="btn btn-sm btn-secondary" onclick="viewPatientPhotos(${idx})" style="${hp?'color:var(--gm);border-color:var(--gm)':''}"><i class="ti ti-photo"></i> ${hp?'View':'None'}</button></td><td style="font-size:12px;color:var(--txm)">${new Date(p.added).toLocaleDateString()}</td><td><div style="display:flex;gap:5px"><button class="btn btn-sm btn-secondary" onclick="openEditPatient(${idx})"><i class="ti ti-edit"></i></button><button class="btn btn-sm btn-danger" onclick="deletePatient(${idx})"><i class="ti ti-trash"></i></button></div></td></tr>`;}).join(''); }
+
+// ── INVENTORY ───────────────────────────────────────────────
+async function saveItem() { const name=document.getElementById('inv-name').value.trim(); const cat=document.getElementById('inv-cat').value; const data={name,cat,desc:document.getElementById('inv-desc').value}; if(FC.includes(cat)){data.p8=document.getElementById('inv-p8').value;data.p4=document.getElementById('inv-p4').value;data.p2=document.getElementById('inv-p2').value;data.p1=document.getElementById('inv-p1').value;}else if(CC.includes(cat)){data.c1=document.getElementById('inv-c1').value;data.c8=document.getElementById('inv-c8').value;data.c4=document.getElementById('inv-c4').value;data.c2=document.getElementById('inv-c2').value;data.c1oz=document.getElementById('inv-c1oz').value;}else{data.price=parseFloat(document.getElementById('inv-price').value)||0;} try{await addInventoryItem(data);closeModal('add-item');renderInventory();renderProdGrid();renderCatFilters();toast('Item added');['inv-name','inv-desc','inv-price','inv-p8','inv-p4','inv-p2','inv-p1','inv-c1','inv-c8','inv-c4','inv-c2','inv-c1oz'].forEach(i=>document.getElementById(i).value='');}catch(e){toast('Error adding item','err');console.error(e);} }
+function openEditItem(idx) { const it=inventory[idx]; document.getElementById('einv-name').value=it.name; document.getElementById('einv-cat').value=it.cat; document.getElementById('einv-desc').value=it.desc||''; document.getElementById('einv-idx').value=idx; const isF=FC.includes(it.cat),isC=CC.includes(it.cat); document.getElementById('einv-flower-prices').style.display=isF?'block':'none'; document.getElementById('einv-conc-prices').style.display=isC?'block':'none'; document.getElementById('einv-std-price').style.display=(!isF&&!isC)?'block':'none'; if(isF){['p8','p4','p2','p1'].forEach(k=>document.getElementById('einv-'+k).value=it[k]||'');}else if(isC){['c1','c8','c4','c2','c1oz'].forEach(k=>document.getElementById('einv-'+k).value=it[k]||'');}else{document.getElementById('einv-price').value=it.price||'';} openModal('edit-item'); }
+async function updateItem() { const idx=parseInt(document.getElementById('einv-idx').value); const cat=document.getElementById('einv-cat').value; const data={name:document.getElementById('einv-name').value.trim(),cat,desc:document.getElementById('einv-desc').value}; if(FC.includes(cat)){['p8','p4','p2','p1'].forEach(k=>data[k]=document.getElementById('einv-'+k).value);}else if(CC.includes(cat)){['c1','c8','c4','c2','c1oz'].forEach(k=>data[k]=document.getElementById('einv-'+k).value);}else{data.price=parseFloat(document.getElementById('einv-price').value)||0;} try{await updateInventoryItem(idx,data);closeModal('edit-item');renderInventory();renderProdGrid();renderCatFilters();toast('Item updated');}catch(e){toast('Error updating item','err');console.error(e);} }
+async function deleteItem(idx) { if(!confirm('Remove this item?')) return; try{await deleteInventoryItem(idx);renderInventory();renderProdGrid();renderCatFilters();toast('Item removed');}catch(e){toast('Error removing item','err');console.error(e);} }
+function renderInventory(q='') { const filtered=inventory.filter(it=>it.name.toLowerCase().includes(q.toLowerCase())||it.cat.toLowerCase().includes(q.toLowerCase())); const tb=document.getElementById('inventory-table'); if(!filtered.length){tb.innerHTML=`<tr><td colspan="4"><div class="empty" style="padding:20px"><i class="ti ti-package-off"></i><p>${q?'No matches':'No items yet'}</p></div></td></tr>`;return;} tb.innerHTML=filtered.map(it=>{const idx=inventory.indexOf(it);const isF=FC.includes(it.cat),isC=CC.includes(it.cat);let pc='';if(isF){pc=FW.filter(w=>it[w.key]&&parseFloat(it[w.key])>0).map(w=>`<div style="font-size:12px">${w.label}: <span style="color:var(--gm);font-weight:600">$${parseFloat(it[w.key]).toFixed(2)}</span></div>`).join('');}else if(isC){pc=CW.filter(w=>it[w.key]&&parseFloat(it[w.key])>0).map(w=>`<div style="font-size:12px">${w.label}: <span style="color:var(--gm);font-weight:600">$${parseFloat(it[w.key]).toFixed(2)}</span></div>`).join('');}else{pc=`<span style="color:var(--gm);font-weight:600">$${parseFloat(it.price||0).toFixed(2)}</span>`;}return`<tr><td><strong>${it.name}</strong>${it.desc?`<br><span style="font-size:11px;color:var(--txm)">${it.desc}</span>`:''}</td><td><span class="badge bg-gray">${it.cat}</span></td><td>${pc}</td><td><div style="display:flex;gap:5px"><button class="btn btn-sm btn-secondary" onclick="openEditItem(${idx})"><i class="ti ti-edit"></i></button><button class="btn btn-sm btn-danger" onclick="deleteItem(${idx})"><i class="ti ti-trash"></i></button></div></td></tr>`;}).join(''); }
+
+// ── RECEIPT ─────────────────────────────────────────────────
+function printReceiptByIdx(idx) { currentReceiptIdx=idx; const o=orders[idx]; const now=new Date(o.created); receiptEditItems=o.items.map(it=>({...it,price:parseFloat(it.price)})); document.getElementById('receipt-header').innerHTML=`<div style="text-align:center;margin-bottom:10px"><div style="font-size:17px;font-weight:800;font-family:'Syne',sans-serif;color:var(--gm)">Archer Farms</div><div style="font-size:11px;color:var(--txm)">Medical Cannabis Dispensary</div></div><div style="font-size:18px;font-weight:700;font-family:'Syne',sans-serif;color:var(--tx);margin-bottom:6px">${o.patientName}</div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span style="color:var(--txm)">Order</span><span>${o.id}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span style="color:var(--txm)">Date</span><span>${now.toLocaleDateString()} ${now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</span></div>${o.patientCard?`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span style="color:var(--txm)">Card #</span><span>${o.patientCard}</span></div>`:''}`; renderReceiptLines(); openModal('receipt'); }
+function renderReceiptLines() { document.getElementById('receipt-line-items').innerHTML=receiptEditItems.map((it,i)=>`<div class="receipt-line"><div style="flex:1"><div style="font-size:13px;font-weight:500">${it.name}</div><div style="font-size:11px;color:var(--txm)">qty: ${it.qty}</div></div><div style="display:flex;align-items:center;gap:4px"><span style="font-size:11px;color:var(--txm)">ea $</span><input class="receipt-price-input" type="number" step="0.01" min="0" value="${it.price.toFixed(2)}" oninput="updRcp(${i},this.value)"></div><div style="font-size:13px;font-weight:700;color:var(--gm);min-width:56px;text-align:right" id="rsub-${i}">$${(it.price*it.qty).toFixed(2)}</div></div>`).join(''); updateReceiptTotal(); }
+function updRcp(i,val) { const v=parseFloat(val); if(!isNaN(v)&&v>=0){receiptEditItems[i].price=v;const s=document.getElementById('rsub-'+i);if(s)s.textContent='$'+(v*receiptEditItems[i].qty).toFixed(2);} updateReceiptTotal(); }
+function updateReceiptTotal() { document.getElementById('receipt-live-total').textContent='$'+receiptEditItems.reduce((s,it)=>s+it.price*it.qty,0).toFixed(2); }
+function doPrint() { const o=orders[currentReceiptIdx]; const now=new Date(o.created); const total=receiptEditItems.reduce((s,it)=>s+it.price*it.qty,0); const el=document.getElementById('receipt-print'); el.hidden=false; el.innerHTML=`<div style="text-align:center;margin-bottom:10px"><div style="font-size:20px;font-weight:900">ARCHER FARMS</div><div style="font-size:11px">Medical Cannabis Dispensary</div><div>--------------------------------</div></div><div style="font-size:16px;font-weight:900;margin-bottom:4px">${o.patientName}</div><div>Order: ${o.id}</div><div>Date: ${now.toLocaleDateString()} ${now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}</div>${o.patientCard?`<div>Card #: ${o.patientCard}</div>`:''}<div>--------------------------------</div>${receiptEditItems.map(it=>`<div>${it.name} x${it.qty}  $${(it.price*it.qty).toFixed(2)}</div>`).join('')}<div>--------------------------------</div><div style="font-weight:900;font-size:16px">TOTAL: $${total.toFixed(2)}</div><div style="margin-top:10px;text-align:center;font-size:11px">Thank you for choosing Archer Farms.</div><div style="text-align:center;font-size:11px">For medical use only.</div>`; window.print(); setTimeout(()=>{ el.hidden=true; }, 1000); }
+
+// ── DASHBOARD ───────────────────────────────────────────────
+function renderDashboard() { const now=new Date(); const ts=now.toDateString(); const rev=orders.filter(o=>o.status==='completed'&&new Date(o.completedAt||o.created).toDateString()===ts).reduce((s,o)=>s+o.total,0); const active=orders.filter(o=>o.status==='placed'||o.status==='ready').length; document.getElementById('dash-today').textContent='$'+rev.toFixed(2); document.getElementById('dash-active').textContent=active; renderCatFilters(); renderProdGrid(); renderHomeActiveOrders(); }
+
+// ── SALES ───────────────────────────────────────────────────
+function setPeriod(p) { currentPeriod=p; ['day','week','month'].forEach(x=>document.getElementById('per-'+x).className='btn '+(x===p?'btn-primary':'btn-secondary')); renderSales(); }
+function renderSales() { const now=new Date(); let start; if(currentPeriod==='day') start=new Date(now.getFullYear(),now.getMonth(),now.getDate()); else if(currentPeriod==='week') start=new Date(now-7*86400000); else start=new Date(now.getFullYear(),now.getMonth(),1); const done=orders.filter(o=>o.status==='completed'&&new Date(o.completedAt||o.created)>=start); const rev=done.reduce((s,o)=>s+o.total,0); const avg=done.length?rev/done.length:0; document.getElementById('sales-stats').innerHTML=`<div class="stat stat-green"><div class="stat-label">Revenue</div><div class="stat-value">$${rev.toFixed(2)}</div><div style="font-size:11px;color:var(--txm);margin-top:3px">${done.length} transactions</div></div><div class="stat stat-gold"><div class="stat-label">Avg Order</div><div class="stat-value">$${avg.toFixed(2)}</div></div><div class="stat"><div class="stat-label">Patients Served</div><div class="stat-value">${new Set(done.map(o=>o.patientIdx).filter(x=>x!==null)).size}</div></div>`; const catMap={}; done.forEach(o=>o.items.forEach(it=>{const base=it.name.split(' — ')[0];const inv=inventory.find(i=>i.name===base);const cat=inv?inv.cat:'Other';catMap[cat]=(catMap[cat]||0)+parseFloat(it.price)*it.qty;})); const maxC=Math.max(...Object.values(catMap),1); document.getElementById('cat-chart').innerHTML=Object.keys(catMap).length?Object.entries(catMap).sort((a,b)=>b[1]-a[1]).map(([cat,val])=>`<div class="chart-row"><div class="chart-label">${cat}</div><div class="chart-track"><div class="chart-fill" style="width:${Math.round(val/maxC*100)}%"><span>$${val.toFixed(0)}</span></div></div></div>`).join(''):'<div class="empty"><i class="ti ti-chart-bar-off"></i><p>No data</p></div>'; document.getElementById('sales-list').innerHTML=done.length?done.slice(-8).reverse().map(o=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd)"><div><div style="font-size:14px;font-weight:700;font-family:'Syne',sans-serif">${o.patientName}</div><div style="font-size:11px;color:var(--txm)">${o.id}${o.updated?' · edited':''}</div></div><div style="display:flex;align-items:center;gap:7px"><button class="btn btn-sm btn-secondary" onclick="openEditOrder(${orders.indexOf(o)})"><i class="ti ti-edit"></i></button><button class="btn btn-sm btn-secondary" onclick="printReceiptByIdx(${orders.indexOf(o)})"><i class="ti ti-printer"></i></button><span style="font-size:14px;font-weight:700;color:var(--gm)">$${o.total.toFixed(2)}</span></div></div>`).join(''):'<div class="empty"><i class="ti ti-receipt-off"></i><p>No sales yet</p></div>'; }
+
+// ══ INIT ════════════════════════════════════════════════════
+async function init() {
+  try { await loadAll(); } catch(e) { console.error('Load failed', e); toast('Could not load from Supabase: '+(e.message||e),true); const b=document.getElementById('db-indicator'); b.textContent='Supabase ERROR'; b.className='db-status local'; }
+  onCatChange('inv-cat','inv-flower-prices','inv-conc-prices','inv-std-price');
+  renderDashboard();
+  setPeriod('day');
+}
+init();
+</script>
+
+<!--
+╔══════════════════════════════════════════════════════════════╗
+║  SUPABASE SQL SCHEMA                                         ║
+║  Paste into: Supabase Dashboard → SQL Editor → New Query    ║
+╚══════════════════════════════════════════════════════════════╝
+
+create table patients (
+  id uuid primary key default gen_random_uuid(),
+  first_name text, last_name text, phone text, dob date,
+  med_card_number text, gov_id text, notes text,
+  card_photo_url text, id_photo_url text,
+  created_at timestamptz default now()
+);
+
+create table inventory (
+  id uuid primary key default gen_random_uuid(),
+  name text not null, category text not null, description text,
+  price numeric(10,2), price_gram numeric(10,2),
+  price_eighth numeric(10,2), price_quarter numeric(10,2),
+  price_half numeric(10,2), price_oz numeric(10,2),
+  created_at timestamptz default now()
+);
+
+create table orders (
+  id uuid primary key default gen_random_uuid(),
+  order_number text unique,
+  patient_name text default 'Walk-in',
+  patient_phone text, patient_card text,
+  total numeric(10,2) default 0,
+  status text default 'placed' check (status in ('placed','ready','completed')),
+  created_at timestamptz default now(),
+  completed_at timestamptz, updated_at timestamptz
+);
+
+create table order_items (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid references orders(id) on delete cascade,
+  item_name text not null, quantity integer default 1,
+  unit_price numeric(10,2) not null,
+  created_at timestamptz default now()
+);
+
+-- Row Level Security (open policies — lock down after adding auth)
+alter table patients enable row level security;
+alter table inventory enable row level security;
+alter table orders enable row level security;
+alter table order_items enable row level security;
+create policy "allow all" on patients for all using (true) with check (true);
+create policy "allow all" on inventory for all using (true) with check (true);
+create policy "allow all" on orders for all using (true) with check (true);
+create policy "allow all" on order_items for all using (true) with check (true);
+-->
