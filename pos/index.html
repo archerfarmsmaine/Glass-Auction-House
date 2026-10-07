@@ -499,12 +499,23 @@ if (!useSupabase) setTimeout(()=>alert('WARNING: Supabase is not connected. Data
 let patients = [], inventory = [], orders = [];
 let orderSeq = parseInt(localStorage.getItem('af_seq') || '1000');
 
+// Supabase returns at most 1000 rows per request, so read in pages until everything is loaded
+async function fetchAll(table, orderCol) {
+  const PAGE = 1000; let all = [];
+  for (let from = 0; ; from += PAGE) {
+    const {data, error} = await sb.from(table).select('*').order(orderCol).order('id').range(from, from + PAGE - 1);
+    if (error) return {data: null, error};
+    all = all.concat(data);
+    if (data.length < PAGE) break;
+  }
+  return {data: all, error: null};
+}
 async function loadAll() {
   if (useSupabase) {
     const [p, inv, ord, st] = await Promise.all([
-      sb.from('patients').select('*').order('added'),
-      sb.from('inventory').select('*').order('added'),
-      sb.from('orders').select('*').order('created_at'),
+      fetchAll('patients', 'added'),
+      fetchAll('inventory', 'added'),
+      fetchAll('orders', 'created_at'),
       sb.from('settings').select('value').eq('key','order_seq').maybeSingle()
     ]);
     const loadErr = p.error || inv.error || ord.error;
