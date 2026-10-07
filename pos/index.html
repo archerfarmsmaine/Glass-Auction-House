@@ -147,6 +147,7 @@ tr:hover td { background: var(--sf2); }
 .prod-cat { font-size: 10px; color: var(--txm); margin-bottom: 5px; }
 .prod-price { font-size: 13px; font-weight: 700; color: var(--gm); font-family: 'Syne', sans-serif; }
 .weight-popup { position: absolute; z-index: 50; background: var(--sf); border: 1px solid var(--gm); border-radius: var(--r); padding: 6px; min-width: 180px; box-shadow: 0 6px 20px rgba(0,0,0,.5); }
+.weight-popup[hidden] { display: none; }
 .weight-opt { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: background .15s; gap: 8px; }
 .weight-opt:hover { background: var(--sf2); }
 
@@ -251,7 +252,7 @@ tr:hover td { background: var(--sf2); }
         </div>
         <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px" id="cat-filters"></div>
         <div class="prod-grid" id="prod-grid"></div>
-        <div id="weight-popup" class="weight-popup" style="display:none"></div>
+        <div id="weight-popup" class="weight-popup" hidden></div>
       </div>
     </div>
     <div class="dash-right">
@@ -669,7 +670,7 @@ function addWeightToCart(invIdx, wk, label, price) { const it=inventory[invIdx];
 function renderCatFilters() { const cats=['All',...new Set(inventory.map(i=>i.cat))]; document.getElementById('cat-filters').innerHTML=cats.map(c=>`<button class="btn btn-sm ${c===activeCat?'btn-primary':'btn-secondary'}" onclick="setCatFilter('${c}')">${c}</button>`).join(''); }
 function setCatFilter(cat) { activeCat=cat; renderCatFilters(); renderProdGrid(); }
 function renderProdGrid() { const q=(document.getElementById('prod-search')||{}).value||''; const grid=document.getElementById('prod-grid'); const items=inventory.filter(it=>{const mc=activeCat==='All'||it.cat===activeCat;const mq=!q||it.name.toLowerCase().includes(q.toLowerCase())||it.cat.toLowerCase().includes(q.toLowerCase());return mc&&mq;}); if(!items.length){grid.innerHTML='<div class="empty" style="grid-column:1/-1"><i class="ti ti-package-off"></i><p>No products found</p></div>';return;} grid.innerHTML=items.map(it=>{const idx=inventory.indexOf(it);const isW=WC.includes(it.cat);const cq=dashCart.filter(c=>c.invIdx===idx).reduce((s,c)=>s+c.qty,0);let pd='';if(isW){const fw=gw(it.cat).find(w=>it[w.key]&&parseFloat(it[w.key])>0);pd=fw?'from $'+parseFloat(it[fw.key]).toFixed(2):'No price';}else{pd=it.price?'$'+parseFloat(it.price).toFixed(2):'—';}return`<button class="prod-tile ${cq>0?'in-cart':''}" onclick="${isW?`showWeightPopup(${idx},this)`:`addSimpleToCart(${idx})`}"><div class="prod-name">${it.name}</div><div class="prod-cat">${it.cat}</div><div style="display:flex;align-items:center;justify-content:space-between;gap:3px"><span class="prod-price">${pd}</span>${cq>0?`<span style="font-size:10px;color:var(--gm);font-weight:700">×${cq}</span>`:''}${isW?'<i class="ti ti-chevron-down" style="font-size:10px;color:var(--txm)"></i>':''}</div></button>`;}).join(''); }
-function addSimpleToCart(invIdx) { const it=inventory[invIdx]; const ck=invIdx+'_std'; const ex=dashCart.find(c=>c.cartKey===ck); if(ex){ex.qty++;}else{dashCart.push({cartKey:ck,invIdx,weightKey:'std',qty:1,name:it.name,price:parseFloat(it.price)||0});} renderProdGrid(); renderDashCart(); }
+function addSimpleToCart(invIdx) { hideWeightPopup(); const it=inventory[invIdx]; const ck=invIdx+'_std'; const ex=dashCart.find(c=>c.cartKey===ck); if(ex){ex.qty++;}else{dashCart.push({cartKey:ck,invIdx,weightKey:'std',qty:1,name:it.name,price:parseFloat(it.price)||0});} renderProdGrid(); renderDashCart(); }
 
 // ── CART ────────────────────────────────────────────────────
 function renderDashCart() { const el=document.getElementById('dash-cart-items'); const tel=document.getElementById('dash-cart-total'); if(!dashCart.length){el.innerHTML='<div class="empty" style="padding:12px"><i class="ti ti-click"></i><p>Tap products to add</p></div>';tel.textContent='$0.00';return;} let total=0; el.innerHTML=dashCart.map(c=>{const sub=c.price*c.qty;total+=sub;return`<div class="cart-item"><div style="flex:1;font-size:12px;font-weight:500;line-height:1.3">${c.name}</div><div class="qty-ctrl"><button class="qty-btn" onclick="adjustCart('${c.cartKey}',-1)">−</button><span style="font-size:13px;font-weight:600;min-width:16px;text-align:center">${c.qty}</span><button class="qty-btn" onclick="adjustCart('${c.cartKey}',1)">+</button></div><span style="font-size:12px;color:var(--gm);font-weight:600;min-width:50px;text-align:right">$${sub.toFixed(2)}</span></div>`;}).join(''); tel.textContent='$'+total.toFixed(2); }
