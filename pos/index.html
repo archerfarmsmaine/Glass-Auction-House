@@ -8,7 +8,7 @@
   ─────────────────────────────────────────
   TO CONNECT SUPABASE:
   1. Replace SUPABASE_URL and SUPABASE_KEY below with your project credentials
-  2. Run the SQL schema at the bottom of this file in your Supabase SQL editor
+  2. Tables (patients, inventory, orders, settings) already exist in the project
   3. App will auto-switch from localStorage → Supabase
 
   If Supabase is paused (free tier pauses after 7 days of inactivity):
@@ -500,17 +500,18 @@ let orderSeq = parseInt(localStorage.getItem('af_seq') || '1000');
 
 async function loadAll() {
   if (useSupabase) {
-    const [p, inv, ord] = await Promise.all([
-      sb.from('patients').select('*').order('created_at'),
-      sb.from('inventory').select('*').order('created_at'),
-      sb.from('orders').select('*, order_items(*)').order('created_at')
+    const [p, inv, ord, st] = await Promise.all([
+      sb.from('patients').select('*').order('added'),
+      sb.from('inventory').select('*').order('added'),
+      sb.from('orders').select('*').order('created_at'),
+      sb.from('settings').select('value').eq('key','order_seq').maybeSingle()
     ]);
     const loadErr = p.error || inv.error || ord.error;
     if (loadErr) throw loadErr;
     patients  = (p.data   || []).map(fromDbPatient);
     inventory = (inv.data || []).map(fromDbInventory);
-    orders    = (ord.data || []).map(fromDbOrder);
-    orders.forEach(o => { if (o.patientName && o.patientName !== 'Walk-in') { const i = patients.findIndex(p => `${p.fname||''} ${p.lname||''}`.trim() === o.patientName); if (i >= 0) o.patientIdx = i; } });
+    orders    = (ord.data || []).map(r => fromDbOrder(r, patients));
+    if (st.data) orderSeq = Math.max(orderSeq, parseInt(st.data.value) || 0);
   } else {
     patients  = JSON.parse(localStorage.getItem('af_patients')  || '[]');
     inventory = JSON.parse(localStorage.getItem('af_inventory') || '[]');
@@ -518,14 +519,27 @@ async function loadAll() {
   }
 }
 
+// ── Row mappers (existing Supabase schema: patients / inventory / orders / settings) ──
 function fromDbPatient(r) {
-  return { id:r.id, fname:r.first_name||'', lname:r.last_name||'', phone:r.phone||'', dob:r.dob||'', card:r.med_card_number||'', govid:r.gov_id||'', notes:r.notes||'', cardPhoto:r.card_photo_url||'', idPhoto:r.id_photo_url||'', added:r.created_at };
+  return { id:r.id, fname:r.fname||'', lname:r.lname||'', phone:r.phone||'', dob:r.dob||'', card:r.card||'', govid:r.gov_id||'', notes:r.notes||'', cardPhoto:r.card_photo||'', idPhoto:r.id_photo||'', added:r.added };
+}
+function toDbPatient(d) {
+  return { fname:d.fname||'', lname:d.lname||'', phone:d.phone||'', dob:d.dob||null, card:d.card||'', gov_id:d.govid||'', notes:d.notes||'', card_photo:d.cardPhoto||'', id_photo:d.idPhoto||'' };
 }
 function fromDbInventory(r) {
-  return { id:r.id, name:r.name, cat:r.category, desc:r.description||'', price:r.price, p8:r.price_eighth, p4:r.price_quarter, p2:r.price_half, p1:r.price_oz, c1:r.price_gram, c8:r.price_eighth, c4:r.price_quarter, c2:r.price_half, c1oz:r.price_oz, added:r.created_at };
+  return { id:r.id, name:r.name||'', cat:r.cat||'', desc:r.description||'', price:r.price, p8:r.p8, p4:r.p4, p2:r.p2, p1:r.p1, c1:r.c1, c8:r.c8, c4:r.c4, c2:r.c2, c1oz:r.c1oz, added:r.added };
 }
-function fromDbOrder(r) {
-  return { id:r.order_number||r.id, dbId:r.id, patientIdx:null, patientName:r.patient_name||'Walk-in', patientPhone:r.patient_phone||'', patientCard:r.patient_card||'', items:(r.order_items||[]).map(i=>({name:i.item_name,qty:i.quantity,price:parseFloat(i.unit_price)})), total:parseFloat(r.total||0), status:r.status||'placed', created:r.created_at, completedAt:r.completed_at, updated:r.updated_at };
+function toDbInventory(d) {
+  const n = v => (v===''||v===undefined||v===null) ? null : (parseFloat(v)||null);
+  return { name:d.name, cat:d.cat, description:d.desc||'', price:n(d.price), p8:n(d.p8), p4:n(d.p4), p2:n(d.p2), p1:n(d.p1), c1:n(d.c1), c8:n(d.c8), c4:n(d.c4), c2:n(d.c2), c1oz:n(d.c1oz) };
+}
+function fromDbOrder(r, pts) {
+  const pi = r.patient_id ? pts.findIndex(p => p.id === r.patient_id) : -1;
+  return { id:r.id, dbId:r.id, patient_id:r.patient_id||null, patientIdx:pi>=0?pi:null, patientName:r.patient_name||'Walk-in', patientPhone:r.patient_phone||'', patientCard:r.patient_card||'', items:r.items||[], total:parseFloat(r.total||0), status:r.status||'placed', created:r.created_at, completedAt:r.completed_at, updated:r.updated_at };
+}
+function toDbOrder(d) {
+  const pid = (d.patientIdx!==null && d.patientIdx!==undefined && patients[d.patientIdx]) ? patients[d.patientIdx].id : (d.patient_id||null);
+  return { patient_id:pid, patient_name:d.patientName, patient_phone:d.patientPhone||'', patient_card:d.patientCard||'', items:d.items||[], total:d.total, status:d.status, completed_at:d.completedAt||null };
 }
 function saveLocal() {
   localStorage.setItem('af_patients',  JSON.stringify(patients));
@@ -533,9 +547,11 @@ function saveLocal() {
   localStorage.setItem('af_orders',    JSON.stringify(orders));
   localStorage.setItem('af_seq',       orderSeq);
 }
+const RLS_MSG = 'Save blocked - no rows changed (check Supabase RLS policies)';
+
 async function addPatient(data) {
   if (useSupabase) {
-    const {data:row,error} = await sb.from('patients').insert({first_name:data.fname,last_name:data.lname,phone:data.phone,dob:data.dob||null,med_card_number:data.card,gov_id:data.govid,notes:data.notes,card_photo_url:data.cardPhoto||null,id_photo_url:data.idPhoto||null}).select().single();
+    const {data:row,error} = await sb.from('patients').insert(toDbPatient(data)).select().single();
     if (error) throw error;
     patients.push(fromDbPatient(row));
   } else {
@@ -546,21 +562,21 @@ async function addPatient(data) {
 async function updatePatientData(idx, data) {
   const p = patients[idx];
   if (useSupabase && p.id) {
-    const {data:rows,error} = await sb.from('patients').update({first_name:data.fname,last_name:data.lname,phone:data.phone,dob:data.dob||null,med_card_number:data.card,gov_id:data.govid,notes:data.notes,card_photo_url:data.cardPhoto||p.cardPhoto||null,id_photo_url:data.idPhoto||p.idPhoto||null}).eq('id',p.id).select();
-    if (error) throw error; if (!rows||!rows.length) throw new Error('Update blocked - check Supabase RLS policies');
+    const {data:rows,error} = await sb.from('patients').update(toDbPatient(data)).eq('id',p.id).select();
+    if (error) throw error; if (!rows||!rows.length) throw new Error(RLS_MSG);
   }
   patients[idx] = {...p, ...data};
   if (!useSupabase) saveLocal();
 }
 async function deletePatientData(idx) {
   const p = patients[idx];
-  if (useSupabase && p.id) { const {error} = await sb.from('patients').delete().eq('id',p.id); if (error) throw error; }
+  if (useSupabase && p.id) { const {data:rows,error} = await sb.from('patients').delete().eq('id',p.id).select(); if (error) throw error; if (!rows||!rows.length) throw new Error(RLS_MSG); }
   patients.splice(idx, 1);
   if (!useSupabase) saveLocal();
 }
 async function addInventoryItem(data) {
   if (useSupabase) {
-    const {data:row,error} = await sb.from('inventory').insert({name:data.name,category:data.cat,description:data.desc,price:data.price||null,price_eighth:data.p8||data.c8||null,price_quarter:data.p4||data.c4||null,price_half:data.p2||data.c2||null,price_oz:data.p1||data.c1oz||null,price_gram:data.c1||null}).select().single();
+    const {data:row,error} = await sb.from('inventory').insert(toDbInventory(data)).select().single();
     if (error) throw error;
     inventory.push(fromDbInventory(row));
   } else {
@@ -571,24 +587,24 @@ async function addInventoryItem(data) {
 async function updateInventoryItem(idx, data) {
   const it = inventory[idx];
   if (useSupabase && it.id) {
-    const {data:rows,error} = await sb.from('inventory').update({name:data.name,category:data.cat,description:data.desc,price:data.price||null,price_eighth:data.p8||data.c8||null,price_quarter:data.p4||data.c4||null,price_half:data.p2||data.c2||null,price_oz:data.p1||data.c1oz||null,price_gram:data.c1||null}).eq('id',it.id).select();
-    if (error) throw error; if (!rows||!rows.length) throw new Error('Update blocked - check Supabase RLS policies');
+    const {data:rows,error} = await sb.from('inventory').update(toDbInventory(data)).eq('id',it.id).select();
+    if (error) throw error; if (!rows||!rows.length) throw new Error(RLS_MSG);
   }
   inventory[idx] = {...it, ...data};
   if (!useSupabase) saveLocal();
 }
 async function deleteInventoryItem(idx) {
   const it = inventory[idx];
-  if (useSupabase && it.id) { const {error} = await sb.from('inventory').delete().eq('id',it.id); if (error) throw error; }
+  if (useSupabase && it.id) { const {data:rows,error} = await sb.from('inventory').delete().eq('id',it.id).select(); if (error) throw error; if (!rows||!rows.length) throw new Error(RLS_MSG); }
   inventory.splice(idx, 1);
   if (!useSupabase) saveLocal();
 }
 async function addOrder(data) {
   if (useSupabase) {
-    const {data:row,error} = await sb.from('orders').insert({order_number:data.id,patient_name:data.patientName,patient_phone:data.patientPhone,patient_card:data.patientCard,total:data.total,status:data.status}).select().single();
+    const {error} = await sb.from('orders').insert({id:data.id, created_at:data.created, ...toDbOrder(data)});
     if (error) throw error;
-    if (data.items.length) { const {error:ie} = await sb.from('order_items').insert(data.items.map(i=>({order_id:row.id,item_name:i.name,quantity:i.qty,unit_price:i.price}))); if (ie) throw ie; }
-    orders.push({...data, dbId:row.id});
+    orders.push({...data, dbId:data.id});
+    sb.from('settings').update({value:String(orderSeq)}).eq('key','order_seq').then(()=>{});
   } else {
     orders.push(data);
     saveLocal();
@@ -597,17 +613,15 @@ async function addOrder(data) {
 async function updateOrderData(idx, data) {
   const o = orders[idx];
   if (useSupabase && o.dbId) {
-    const {data:rows,error} = await sb.from('orders').update({patient_name:data.patientName,patient_phone:data.patientPhone,patient_card:data.patientCard,total:data.total,status:data.status,completed_at:data.completedAt||null,updated_at:new Date().toISOString()}).eq('id',o.dbId).select();
-    if (error) throw error; if (!rows||!rows.length) throw new Error('Update blocked - check Supabase RLS policies');
-    const {error:de} = await sb.from('order_items').delete().eq('order_id',o.dbId); if (de) throw de;
-    if (data.items.length) { const {error:ie} = await sb.from('order_items').insert(data.items.map(i=>({order_id:o.dbId,item_name:i.name,quantity:i.qty,unit_price:i.price}))); if (ie) throw ie; }
+    const {data:rows,error} = await sb.from('orders').update({...toDbOrder(data), updated_at:new Date().toISOString()}).eq('id',o.dbId).select();
+    if (error) throw error; if (!rows||!rows.length) throw new Error(RLS_MSG);
   }
   orders[idx] = {...o, ...data};
   if (!useSupabase) saveLocal();
 }
 async function deleteOrderData(idx) {
   const o = orders[idx];
-  if (useSupabase && o.dbId) { const {error:de} = await sb.from('order_items').delete().eq('order_id',o.dbId); if (de) throw de; const {error} = await sb.from('orders').delete().eq('id',o.dbId); if (error) throw error; }
+  if (useSupabase && o.dbId) { const {data:rows,error} = await sb.from('orders').delete().eq('id',o.dbId).select(); if (error) throw error; if (!rows||!rows.length) throw new Error(RLS_MSG); }
   orders.splice(idx, 1);
   if (!useSupabase) saveLocal();
 }
@@ -725,56 +739,3 @@ async function init() {
 }
 init();
 </script>
-
-<!--
-╔══════════════════════════════════════════════════════════════╗
-║  SUPABASE SQL SCHEMA                                         ║
-║  Paste into: Supabase Dashboard → SQL Editor → New Query    ║
-╚══════════════════════════════════════════════════════════════╝
-
-create table patients (
-  id uuid primary key default gen_random_uuid(),
-  first_name text, last_name text, phone text, dob date,
-  med_card_number text, gov_id text, notes text,
-  card_photo_url text, id_photo_url text,
-  created_at timestamptz default now()
-);
-
-create table inventory (
-  id uuid primary key default gen_random_uuid(),
-  name text not null, category text not null, description text,
-  price numeric(10,2), price_gram numeric(10,2),
-  price_eighth numeric(10,2), price_quarter numeric(10,2),
-  price_half numeric(10,2), price_oz numeric(10,2),
-  created_at timestamptz default now()
-);
-
-create table orders (
-  id uuid primary key default gen_random_uuid(),
-  order_number text unique,
-  patient_name text default 'Walk-in',
-  patient_phone text, patient_card text,
-  total numeric(10,2) default 0,
-  status text default 'placed' check (status in ('placed','ready','completed')),
-  created_at timestamptz default now(),
-  completed_at timestamptz, updated_at timestamptz
-);
-
-create table order_items (
-  id uuid primary key default gen_random_uuid(),
-  order_id uuid references orders(id) on delete cascade,
-  item_name text not null, quantity integer default 1,
-  unit_price numeric(10,2) not null,
-  created_at timestamptz default now()
-);
-
--- Row Level Security (open policies — lock down after adding auth)
-alter table patients enable row level security;
-alter table inventory enable row level security;
-alter table orders enable row level security;
-alter table order_items enable row level security;
-create policy "allow all" on patients for all using (true) with check (true);
-create policy "allow all" on inventory for all using (true) with check (true);
-create policy "allow all" on orders for all using (true) with check (true);
-create policy "allow all" on order_items for all using (true) with check (true);
--->
